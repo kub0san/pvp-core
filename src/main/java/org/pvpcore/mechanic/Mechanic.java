@@ -85,7 +85,11 @@ public interface Mechanic {
         return false;
     }
 
-    /** Declared supported server version range marker; null means no explicit restriction. */
+    /**
+     * Declared supported server version range; null means no explicit restriction.
+     * Format: {@code lower..upper} (inclusive), e.g. {@code 1.21.11..26.3}; either bound may
+     * be omitted. A single version is treated as a minimum.
+     */
     default String supportedVersionRange() {
         return null;
     }

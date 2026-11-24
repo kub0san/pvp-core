@@ -2,6 +2,7 @@ package org.pvpcore.mechanic;
 
 import org.pvpcore.PvPCorePlugin;
 import org.pvpcore.config.core.CoreConfig;
+import org.pvpcore.util.VersionSupport;
 
 import java.util.Collection;
 import java.util.Collections;
@@ -289,8 +290,28 @@ public final class MechanicRegistry {
     }
 
     private boolean isVersionInDeclaredRange(String range) {
-        // Current project targets supported Paper range; explicit ranges declared by mechanics are treated as supported unless proven otherwise.
-        return true;
+        return isVersionInDeclaredRange(range, VersionSupport.minecraftVersion());
+    }
+
+    /**
+     * Checks a declared range of the form {@code lower..upper} (inclusive), with either bound
+     * optional ({@code ..26.2}, {@code 1.21.11..}) and a single version treated as a minimum.
+     * Package-private so the pure comparison can be tested without a running server.
+     */
+    static boolean isVersionInDeclaredRange(String range, String currentVersion) {
+        if (range == null || range.isBlank() || currentVersion == null) {
+            return false;
+        }
+        int separator = range.indexOf("..");
+        if (separator < 0) {
+            return VersionSupport.compare(currentVersion, range.trim()) >= 0;
+        }
+        String lower = range.substring(0, separator).trim();
+        String upper = range.substring(separator + 2).trim();
+        if (!lower.isEmpty() && VersionSupport.compare(currentVersion, lower) < 0) {
+            return false;
+        }
+        return upper.isEmpty() || VersionSupport.compare(currentVersion, upper) <= 0;
     }
 
     private MechanicStatus failureStatus(Mechanic mechanic, boolean requestedByToggle) {
