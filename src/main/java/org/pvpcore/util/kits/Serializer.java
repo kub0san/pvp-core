@@ -61,7 +61,11 @@ public final class Serializer {
             return new ItemStack[0];
         }
 
-        // 3. Try the NEW Paper format first
+        // 3. Try the NEW Paper format first. Only a negative per-item length (the legacy
+        // Java serialization header) falls through to the old format. Any other framing
+        // error returns the items decoded so far: falling through would reinterpret new
+        // bytes as legacy objects and discard the entire kit/page.
+        boolean legacyFormat = false;
         try (DataInputStream input = new DataInputStream(new ByteArrayInputStream(bytes))) {
             int length = input.readInt();
 
@@ -74,31 +78,33 @@ public final class Serializer {
             long totalBytes = 0;
 
             for (int i = 0; i < length; i++) {
-                int itemLength = input.readInt();
+                int itemLength;
+                try {
+                    itemLength = input.readInt();
+                } catch (IOException truncated) {
+                    return items;
+                }
 
                 // Java's BukkitObjectInputStream uses a header (0xACED0005) which is negative.
                 // If we see a negative number, this is the OLD format. Abort and fall back.
                 if (itemLength < 0) {
-                    throw new IOException("Detected legacy format header");
+                    legacyFormat = true;
+                    break;
                 }
 
-                // Validate itemLength to prevent OOM attacks
-                if (itemLength > MAX_ITEM_BYTES) {
-                    throw new IOException("Item size exceeds safe limit: " + itemLength);
-                }
-
-                totalBytes += itemLength;
-                if (totalBytes > MAX_TOTAL_BYTES) {
-                    throw new IOException("Total array size exceeds safe limit.");
-                }
-
-                if (itemLength == 0) {
-                    items[i] = null;
-                    continue;
+                // Invalid lengths or truncated payloads mean no further item can be located;
+                // keep what was already decoded instead of losing the whole array.
+                if (itemLength > MAX_ITEM_BYTES || totalBytes + itemLength > MAX_TOTAL_BYTES) {
+                    return items;
                 }
 
                 byte[] itemBytes = new byte[itemLength];
-                input.readFully(itemBytes);
+                try {
+                    input.readFully(itemBytes);
+                } catch (IOException truncated) {
+                    return items;
+                }
+                totalBytes += itemLength;
 
                 try {
                     items[i] = ItemStack.deserializeBytes(itemBytes);
@@ -108,7 +114,9 @@ public final class Serializer {
                     items[i] = null;
                 }
             }
-            return items;
+            if (!legacyFormat) {
+                return items;
+            }
 
         } catch (IOException e) {
             // Fall through to old format
