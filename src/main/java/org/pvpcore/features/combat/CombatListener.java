@@ -11,6 +11,7 @@ import org.bukkit.event.block.Action;
 import org.bukkit.event.block.BlockExplodeEvent;
 import org.bukkit.event.entity.EntityDamageEvent;
 import org.bukkit.event.entity.PlayerDeathEvent;
+import org.bukkit.event.player.PlayerChangedWorldEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.event.player.PlayerTeleportEvent;
@@ -18,7 +19,9 @@ import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.entity.Player;
 
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Turns Bukkit events into combat-tag bookkeeping.
@@ -33,6 +36,8 @@ public final class CombatListener implements Listener {
     private final DamageAttributionResolver resolver;
     private final AnchorAttributionTracker anchorTracker;
     private final LogoutPolicy logoutPolicy;
+    /** Players whose ender-pearl teleport is still waiting for its world-change event. */
+    private final Set<UUID> pendingPearlTags = ConcurrentHashMap.newKeySet();
 
     public CombatListener(
             CombatManager combatManager,
@@ -117,7 +122,26 @@ public final class CombatListener implements Listener {
         if (event.getCause() != PlayerTeleportEvent.TeleportCause.ENDER_PEARL) {
             return;
         }
-        combatManager.tagPlayer(event.getPlayer().getUniqueId(), CombatCause.PLAYER_PROJECTILE);
+        UUID playerId = event.getPlayer().getUniqueId();
+        // Tag immediately (as before): if the world change never materialises the tag is not
+        // lost. The pending marker only tells onWorldChange to keep this deliberate tag.
+        combatManager.tagPlayer(playerId, CombatCause.PLAYER_PROJECTILE);
+        if (event.getTo().getWorld() != event.getFrom().getWorld()) {
+            pendingPearlTags.add(playerId);
+        }
+    }
+
+    /**
+     * Combat is a per-world encounter: leaving the world ends the tag, so safe-zone blocking and
+     * logout penalties from the old world cannot follow the player somewhere else.
+     */
+    @EventHandler(priority = EventPriority.MONITOR)
+    public void onWorldChange(PlayerChangedWorldEvent event) {
+        UUID playerId = event.getPlayer().getUniqueId();
+        if (!pendingPearlTags.remove(playerId)) {
+            combatManager.clear(playerId, CombatEndReason.CLEARED);
+        }
+        // A pending ender-pearl hop deliberately keeps its tag across this world change.
     }
 
     // Not ignoreCancelled: the deprecated isCancelled() maps to useInteractedBlock() == DENY,
@@ -169,6 +193,7 @@ public final class CombatListener implements Listener {
     @EventHandler(priority = EventPriority.NORMAL)
     public void onQuit(PlayerQuitEvent event) {
         UUID playerId = event.getPlayer().getUniqueId();
+        pendingPearlTags.remove(playerId);
         // The policy runs BEFORE the session is cleared so it can inspect the final state;
         // it must not be handed a cleared session. The clear runs in a finally block so a
         // throwing policy can never leave the session behind.
