@@ -128,8 +128,11 @@ public final class TeleportCommands implements CommandExecutor, TabCompleter {
         Player requester = Bukkit.getPlayer(request.sender());
         String requesterName = requester != null ? requester.getName() : "Offline player";
 
-        if (request.type() == RequestManager.Type.TO_TARGET && requester == null) {
-            player.sendMessage(messages.get("player-not-found", "player", requesterName));
+        // Both request types need a live sender: TARGET_HERE later reads the requester's
+        // location, which is null after they quit, and the service would report failure
+        // after both players had already been told the request was accepted.
+        if (requester == null) {
+            player.sendMessage(messages.get("request-sender-offline"));
             return;
         }
 
