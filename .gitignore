@@ -1,0 +1,35 @@
+.gradle/
+build/
+out/
+.idea/
+*.iml
+*.ipr
+*.iws
+.DS_Store
+Thumbs.db
+# Eclipse metadata (local-only)
+.classpath
+.project
+.settings/
+# agent / tooling scratch (local-only)
+.snapshots/
+.planning/
+.superpowers/
+.scratch/
+tools/__pycache__/
+# temp scratch artifacts
+.tmp_*
+# pvp-core runtime / reference (local-only)
+run/
+CombatLog-ref/
+# local-only docs / agent metadata (mirrors shenanigans-core)
+/AGENTS.md
+/mempalace.yaml
+/GLOSSARY.md
+entities.json
+codereview-*.md
+/docs/agents/
+/docs/superpowers/
+# JVM crash dumps
+hs_err_pid*.log
+replay_pid*.log

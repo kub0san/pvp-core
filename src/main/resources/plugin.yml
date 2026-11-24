@@ -1,0 +1,441 @@
+name: pvp-core
+version: '${version}'
+main: org.pvpcore.PvPCorePlugin
+# Minimum supported Paper API. Paper 1.21.11 through 26.3 accept this value; newer servers
+# load the plugin on their own newer API. Do not bump this when only the build target changes.
+api-version: '1.21.11'
+load: STARTUP
+description: 'All in one plugin for most pvp-based servers.'
+# Optional: Faster Crystals and Shield Fixes use PacketEvents. If it is absent,
+# every other mechanic still loads and those two toggles fail closed.
+# Optional: Multiverse-Core is only used for world lifecycle features. The PvP world
+# generator is pure Bukkit API and works without it.
+softdepend: [packetevents, Multiverse-Core, knockbacksync, WorldGuard]
+authors: [hizeric]
+commands:
+  pvp-core:
+    description: Manage PvPCore mechanics
+    usage: /pvp-core <list|toggle|enable|disable|reload>
+    aliases: [pvpcore, pc]
+  tpa:
+    description: Request to teleport to another player
+    usage: /tpa <player>
+  tpahere:
+    description: Request another player to teleport to you
+    usage: /tpahere <player>
+  tpaccept:
+    description: Accept a teleport request
+    usage: /tpaccept
+  tpdeny:
+    description: Deny a teleport request
+    usage: /tpdeny
+  tpcancel:
+    description: Cancel your outgoing teleport request
+    usage: /tpcancel
+  tphere:
+    description: Instantly teleport a player to you
+    usage: /tphere <player>
+  back:
+    description: Return to your last location
+    usage: /back
+  spawn:
+    description: Teleport to the server spawn
+    usage: /spawn
+  setspawn:
+    description: Set the server spawn to your location
+    usage: /setspawn
+  rtp:
+    description: Teleport to a random safe location
+    usage: /rtp [region]
+
+
+  perplayerkit:
+    usage: /<command>
+    permission: perplayerkit.admin
+
+  aboutperplayerkit:
+    usage: /<command>
+
+  kitroom:
+    usage: /<command>
+    permission: perplayerkit.admin
+
+  kit:
+    usage: /<command>
+    permission: pvpcore.kits.use
+    aliases: k
+
+  copykit:
+    usage: /<command>
+    permission: perplayerkit.copykit
+    aliases:
+      - copyec
+      - copyenderchest
+
+  sharekit:
+    usage: /<command> <slot> [player]
+    permission: perplayerkit.sharekit
+
+  shareec:
+    usage: /<command> <slot> [player]
+    permission: perplayerkit.shareenderchest
+    aliases:
+      - shareenderchest
+
+  transferkits:
+    usage: /<command> <player>
+    permission: perplayerkit.transferkits
+    aliases:
+      - transferkit
+
+  shareaccept:
+    usage: /<command> [id]
+    permission: perplayerkit.copykit
+
+  sharedecline:
+    usage: /<command> [id]
+    permission: perplayerkit.copykit
+
+  swapkit:
+    usage: /<command>
+    permission: perplayerkit.swapkit
+
+  deletekit:
+    usage: /<command>
+    permission: perplayerkit.deletekit
+
+  deleteec:
+    usage: /<command> <slot>
+    permission: perplayerkit.deleteenderchest
+    aliases: deleteenderchest
+
+  inspectkit:
+    usage: /<command>
+    permission: perplayerkit.staff
+
+  inspectec:
+    usage: /<command>
+    permission: perplayerkit.staff
+
+  publickit:
+    usage: /<command>
+    permission: perplayerkit.publickit
+    aliases:
+      - pk
+      - premadekit
+
+  k1:
+    usage: /<command>
+    permission: perplayerkit.kit
+    aliases: kit1
+  k2:
+    usage: /<command>
+    permission: perplayerkit.kit
+    aliases: kit2
+  k3:
+    usage: /<command>
+    permission: perplayerkit.kit
+    aliases: kit3
+  k4:
+    usage: /<command>
+    permission: perplayerkit.kit
+    aliases: kit4
+  k5:
+    usage: /<command>
+    permission: perplayerkit.kit
+    aliases: kit5
+  k6:
+    usage: /<command>
+    permission: perplayerkit.kit
+    aliases: kit6
+  k7:
+    usage: /<command>
+    permission: perplayerkit.kit
+    aliases: kit7
+  k8:
+    usage: /<command>
+    permission: perplayerkit.kit
+    aliases: kit8
+  k9:
+    usage: /<command>
+    permission: perplayerkit.kit
+    aliases: kit9
+
+  ec1:
+    usage: /<command>
+    permission: perplayerkit.enderchest
+    aliases: enderchest1
+  ec2:
+    usage: /<command>
+    permission: perplayerkit.enderchest
+    aliases: enderchest2
+  ec3:
+    usage: /<command>
+    permission: perplayerkit.enderchest
+    aliases: enderchest3
+  ec4:
+    usage: /<command>
+    permission: perplayerkit.enderchest
+    aliases: enderchest4
+  ec5:
+    usage: /<command>
+    permission: perplayerkit.enderchest
+    aliases: enderchest5
+  ec6:
+    usage: /<command>
+    permission: perplayerkit.enderchest
+    aliases: enderchest6
+  ec7:
+    usage: /<command>
+    permission: perplayerkit.enderchest
+    aliases: enderchest7
+  ec8:
+    usage: /<command>
+    permission: perplayerkit.enderchest
+    aliases: enderchest8
+  ec9:
+    usage: /<command>
+    permission: perplayerkit.enderchest
+    aliases: enderchest9
+
+  enderchest:
+    usage: /<command>
+    permission: perplayerkit.viewenderchest
+    aliases: ec
+
+  savepublickit:
+    usage: /<command> <id>
+    permission: perplayerkit.admin
+
+  purgeitem:
+    usage: /<command> <item> <all confirm|player ...>
+    permission: perplayerkit.admin
+    aliases:
+      - purgeitems
+
+  kitdata:
+    usage: /<command> <export <all|kitroom|publickits|playerkits> <file>|import <file>>
+    permission: perplayerkit.admin
+
+  regear:
+    usage: /<command>
+    permission: perplayerkit.regear
+    aliases:
+      - rg
+  heal:
+    usage: /<command>
+    permission: perplayerkit.heal
+
+  repair:
+    usage: /<command>
+    permission: perplayerkit.repair
+
+
+permissions:
+  pvpcore.use:
+    description: Allows listing mechanics
+    default: op
+  pvpcore.toggle:
+    description: Allows enabling, disabling and toggling mechanics
+    default: op
+  pvpcore.reload:
+    description: Allows reloading the PvPCore config
+    default: op
+
+  pvpcore.teleportation.*:
+    description: All teleportation commands and bypasses
+    default: op
+    children:
+      pvpcore.teleportation.tpa: true
+      pvpcore.teleportation.tpahere: true
+      pvpcore.teleportation.tpaccept: true
+      pvpcore.teleportation.tpdeny: true
+      pvpcore.teleportation.tpcancel: true
+      pvpcore.teleportation.back: true
+      pvpcore.teleportation.spawn: true
+      pvpcore.teleportation.tphere: true
+      pvpcore.teleportation.setspawn: true
+      pvpcore.teleportation.rtp: true
+      pvpcore.teleportation.rtp.admin: true
+      pvpcore.teleportation.bypass.cooldown: true
+      pvpcore.teleportation.bypass.warmup: true
+
+  pvpcore.teleportation.tpa:
+    default: true
+  pvpcore.teleportation.tpahere:
+    default: true
+  pvpcore.teleportation.tpaccept:
+    default: true
+  pvpcore.teleportation.tpdeny:
+    default: true
+  pvpcore.teleportation.tpcancel:
+    default: true
+  pvpcore.teleportation.back:
+    default: true
+  pvpcore.teleportation.spawn:
+    default: true
+  pvpcore.teleportation.tphere:
+    default: op
+  pvpcore.teleportation.setspawn:
+    default: op
+  pvpcore.teleportation.rtp:
+    description: Use /rtp
+    default: true
+  pvpcore.teleportation.rtp.admin:
+    description: Use /rtp info
+    default: op
+  pvpcore.teleportation.bypass.cooldown:
+    default: op
+  pvpcore.teleportation.bypass.warmup:
+    default: op
+
+  # --- NEW UNIFIED KITS PERMISSIONS ---
+  pvpcore.kits.*:
+    description: All Kits commands
+    default: op
+    children:
+      pvpcore.kits.admin: true
+      pvpcore.kits.staff: true
+      pvpcore.kits.use: true
+
+  pvpcore.kits.admin:
+    default: op
+    children:
+      pvpcore.kits.staff: true
+      pvpcore.kits.editkitroom: true
+  pvpcore.kits.staff:
+    default: op
+  pvpcore.kits.editkitroom:
+    default: op
+  pvpcore.kits.notify:
+    default: op
+
+  pvpcore.kits.use:
+    default: true
+    children:
+      pvpcore.kits.menu: true
+      pvpcore.kits.copykit: true
+      pvpcore.kits.sharekit: true
+      pvpcore.kits.shareenderchest: true
+      pvpcore.kits.transferkits: true
+      pvpcore.kits.swapkit: true
+      pvpcore.kits.deletekit: true
+      pvpcore.kits.deleteenderchest: true
+      pvpcore.kits.publickit: true
+      pvpcore.kits.kit: true
+      pvpcore.kits.enderchest: true
+      pvpcore.kits.viewenderchest: true
+      pvpcore.kits.regear: true
+      pvpcore.kits.heal: true
+      pvpcore.kits.repair: true
+      pvpcore.kits.rekitonrespawn: true
+      pvpcore.kits.rekitonkill: true
+
+  pvpcore.kits.menu:
+    default: true
+  pvpcore.kits.kit:
+    default: true
+  pvpcore.kits.enderchest:
+    default: true
+  pvpcore.kits.publickit:
+    default: true
+  pvpcore.kits.regear:
+    default: true
+  pvpcore.kits.heal:
+    default: true
+  pvpcore.kits.repair:
+    default: true
+  pvpcore.kits.sharekit:
+    default: true
+  pvpcore.kits.shareenderchest:
+    default: true
+  pvpcore.kits.copykit:
+    default: true
+  pvpcore.kits.transferkits:
+    default: true
+  pvpcore.kits.swapkit:
+    default: true
+  pvpcore.kits.deletekit:
+    default: true
+  pvpcore.kits.deleteenderchest:
+    default: true
+  pvpcore.kits.viewenderchest:
+    default: true
+  pvpcore.kits.rekitonrespawn:
+    default: true
+  pvpcore.kits.rekitonkill:
+    default: true
+
+  # --- LEGACY ALIASES (Kept for backwards compatibility with Java code) ---
+  perplayerkit.admin:
+    default: op
+    children:
+      pvpcore.kits.admin: true
+  perplayerkit.staff:
+    default: op
+    children:
+      pvpcore.kits.staff: true
+  perplayerkit.editkitroom:
+    default: op
+    children:
+      pvpcore.kits.editkitroom: true
+  perplayerkit.kitnotify:
+    default: op
+    children:
+      pvpcore.kits.notify: true
+
+  # Legacy Player Permissions (Default TRUE)
+  perplayerkit.use:
+    default: true
+    children:
+      perplayerkit.menu: true
+      perplayerkit.copykit: true
+      perplayerkit.sharekit: true
+      perplayerkit.shareenderchest: true
+      perplayerkit.transferkits: true
+      perplayerkit.swapkit: true
+      perplayerkit.deletekit: true
+      perplayerkit.deleteenderchest: true
+      perplayerkit.publickit: true
+      perplayerkit.kit: true
+      perplayerkit.enderchest: true
+      perplayerkit.viewenderchest: true
+      perplayerkit.regear: true
+      perplayerkit.heal: true
+      perplayerkit.repair: true
+      perplayerkit.rekitonrespawn: true
+      perplayerkit.rekitonkill: true
+  perplayerkit.menu:
+    default: true
+  perplayerkit.kit:
+    default: true
+  perplayerkit.enderchest:
+    default: true
+  perplayerkit.publickit:
+    default: true
+  perplayerkit.regear:
+    default: true
+  perplayerkit.heal:
+    default: true
+  perplayerkit.repair:
+    default: true
+  perplayerkit.sharekit:
+    default: true
+  perplayerkit.shareenderchest:
+    default: true
+  perplayerkit.copykit:
+    default: true
+  perplayerkit.transferkits:
+    default: true
+  perplayerkit.swapkit:
+    default: true
+  perplayerkit.deletekit:
+    default: true
+  perplayerkit.deleteenderchest:
+    default: true
+  perplayerkit.viewenderchest:
+    default: true
+  perplayerkit.rekitonrespawn:
+    default: true
+  perplayerkit.rekitonkill:
+    default: true

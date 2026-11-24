@@ -1,0 +1,107 @@
+# PvPCore random teleport (/rtp). Applied on /pvp-core reload.
+#
+# How it works: locations are found in the background and kept in a small ready-to-use pool
+# for each region, so /rtp is normally instant. If the pool is empty the player's location is
+# searched on demand. Chunks are loaded by the server asynchronously.
+
+# Set to false to turn off /rtp (and the background searching) without unloading PvPCore.
+enabled: true
+
+# The region /rtp uses when the player's current world has no region of its own.
+# Leave empty to make players type /rtp <region> in that case.
+default-region: overworld
+
+# Seconds the player must stand still before the teleport. -1 = use warmup.seconds from
+# teleportation/config.yml. Damage and (if enabled there) movement cancel it.
+warmup-seconds: -1
+
+# Seconds between /rtp uses. -1 = use cooldown.seconds from teleportation/config.yml.
+# Players with pvpcore.teleportation.bypass.cooldown ignore it.
+cooldown-seconds: 30
+
+search:
+  # Chunks tried per search before giving up. Each try may generate a chunk, which is the
+  # expensive part, so keep this modest.
+  max-attempts: 12
+  # After a chunk loads, this many random columns inside it are tested before moving on.
+  columns-per-chunk: 6
+  # Keep this many blocks away from the world border.
+  border-margin: 16
+  # Background searches allowed at once (across all regions). Raise only if the server has
+  # plenty of spare tick time.
+  max-concurrent-searches: 2
+  # A search that takes longer than this is abandoned.
+  timeout-seconds: 15
+  # Admin debugging: log effective bounds and search counters for each search.
+  debug: false
+
+pool:
+  # false = never search in the background; every /rtp searches on demand.
+  enabled: true
+  # Ready locations kept per region. Higher = more instant uses in a row, more chunks
+  # generated in advance. 0 = same as enabled: false.
+  size: 4
+  # A ready location older than this is thrown away and replaced.
+  max-age-seconds: 900
+  # How often pools are topped up. Nothing is searched while the server is empty.
+  refill-interval-seconds: 10
+
+safety:
+  # Never land on, or with the body inside, any of these. Liquids and non-solid ground are
+  # always rejected, and so are leaves as ground.
+  unsafe-blocks:
+    - LAVA
+    - WATER
+    - FIRE
+    - SOUL_FIRE
+    - CACTUS
+    - MAGMA_BLOCK
+    - CAMPFIRE
+    - SOUL_CAMPFIRE
+    - POWDER_SNOW
+    - SWEET_BERRY_BUSH
+    - COBWEB
+    - WITHER_ROSE
+    - POINTED_DRIPSTONE
+    - BUBBLE_COLUMN
+    - NETHER_PORTAL
+    - END_PORTAL
+    - END_GATEWAY
+  # Biome keys to avoid, for example [minecraft:deep_dark, minecraft:swamp]. The
+  # "minecraft:" prefix is optional.
+  blocked-biomes: []
+  # Skip any spot inside a WorldGuard region (arenas, spawn, claims). Ignored when
+  # WorldGuard is not installed.
+  avoid-worldguard-regions: true
+
+# One entry per destination. The key is what players type: /rtp <key>.
+# Do not name a region "info"; /rtp info is the admin status command.
+#
+#   world        World name. Does not have to be loaded when the server starts.
+#   shape        circle or square.
+#   center       border (the world border's centre) or "x, z" for a fixed point.
+#   min-radius   Closest allowed distance from the centre, in blocks.
+#   max-radius   Furthest allowed distance. 0 = fill the world border. If the border is
+#                still at the vanilla default (60 million blocks), set a real number here.
+#   vertical     surface (highest ground, right for the overworld) or scan (search downward
+#                from max-y; use for caves and the Nether, with max-y below the roof).
+#   min-y/max-y  Optional height limits for the player's feet. Default: the world's limits.
+#   permission   Optional. Players need this permission to use the region.
+regions:
+  overworld:
+    world: world
+    shape: circle
+    center: border
+    min-radius: 2048
+    max-radius: 8096
+    vertical: surface
+    permission: ""
+
+  # Example for a PvPCore-generated arena world (PvPCore sets the border for these worlds):
+  # arena:
+  #   world: pvp_arena
+  #   shape: square
+  #   center: border
+  #   min-radius: 0
+  #   max-radius: 0
+  #   vertical: surface

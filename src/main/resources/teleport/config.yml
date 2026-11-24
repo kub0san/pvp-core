@@ -1,0 +1,28 @@
+# PvPCore teleportation. Applied on /pvp-core reload.
+
+# Set to false to disable every teleport command without unloading PvPCore.
+enabled: true
+
+requests:
+  # How long a /tpa or /tpahere request stays open, in seconds.
+  expiry-seconds: 120
+  # Minimum seconds between sending new teleport requests (anti-spam).
+  # Players with pvpcore.teleportation.bypass.cooldown ignore it.
+  cooldown-seconds: 5
+
+warmup:
+  # Seconds a player must stand still before the teleport happens. 0 = instant.
+  seconds: 3
+  # Cancel the warmup when the player moves. Taking damage always cancels it.
+  cancel-on-move: true
+
+cooldown:
+  # Seconds between teleport uses for players without pvpcore.teleportation.bypass.cooldown.
+  seconds: 5
+
+respawn:
+  # false (default): every player respawns at /setspawn, even if they have a bed or a
+  # respawn anchor. This is the usual choice for a PvP server.
+  # true: beds and respawn anchors win when the player has one. Players without a bed
+  # or anchor still respawn at /setspawn.
+  respect-bed-and-anchor: false

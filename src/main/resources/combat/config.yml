@@ -1,0 +1,44 @@
+# PvPCore Combat Tag. Applied on /pvp-core reload.
+# Tracks when players are in combat and attributes indirect damage (e.g. respawn-anchor
+# explosions) to the responsible player when reliable. Other features consume this through
+# org.pvpcore.features.combat.CombatManager.
+# All numeric values must be positive; invalid values are replaced by the defaults
+# below and a warning is logged.
+
+# Set to false to disable combat tagging entirely without unloading PvPCore (no tagging,
+# no tracking, no cleanup churn). Applied on /pvp-core reload.
+enabled: true
+
+# Seconds a player remains tagged after a qualifying player hit. Refreshed on each hit.
+tag-duration-seconds: 15
+# How long after an anchor interaction that click may attribute a later explosion
+# at the same block to that player.
+anchor-attribution-window-seconds: 3
+# Maximum distance (blocks) between a reported damage origin and a recorded anchor
+# explosion for them to count as the same event.
+anchor-attribution-radius-blocks: 2.0
+
+# Penalty for logging out while in combat (the session is always inspected before it is
+# cleared, and the broadcast goes out regardless of mode except in 'none'):
+#   none - no penalty; the session is simply cleared. Default.
+#   drop - drop the inventory and XP at the logout location.
+#   kill - set health to zero (the death drops as usual).
+# The penalty is opt-in: an admin has to pick 'drop' or 'kill' explicitly.
+penalty:
+  mode: none
+
+# Extra tag triggers that don't need a player attacker.
+triggers:
+  # Tag a player who takes damage from any explosion-family source (crystals, anchors,
+  # TNT, beds...), even when nobody can be attributed.
+  explosions: true
+  # Tag the shooter of an ender pearl when the pearl lands.
+  ender-pearl: true
+  # Tag players who are within combat-zone-radius blocks of each other (experimental).
+  combat-zone: false
+  combat-zone-radius: 10.0
+
+# Prevent combat-tagged players from walking into WorldGuard safe zones
+# (regions with 'pvp: deny'). Requires WorldGuard; does nothing without it.
+# Applied on /pvp-core reload.
+safe-zone-move-blocking: true

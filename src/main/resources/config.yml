@@ -1,0 +1,118 @@
+# PvPCore configuration.
+# Mechanics can be toggled in game with /pvp-core toggle <mechanic>; toggling writes here.
+
+# Verbose logging for mechanics that support it (Faster Crystals, Shield Fixes, Shield Sync,
+# Legacy Projectiles, No Projectile Spread, Legacy Ender Pearls, and Consistent IPC).
+# Applies after /pvp-core reload or a restart.
+debug: false
+
+# Legacy command bridge. When enabled, the original top-level commands (e.g. /kit,
+# /regear, /sharekit, /perplayerkit, /tpa) are transparently forwarded to their
+# /pvp-core <sub> equivalent, so existing binds, docs and muscle memory keep working.
+command-bridge:
+  enabled: true
+
+mechanics:
+  attributeswap:
+    enabled: false
+  fastercrystals:
+    enabled: false
+  shieldfixes:
+    enabled: false
+  shieldstun:
+    enabled: false
+  shieldsync:
+    enabled: false
+  antitotemghost:
+    # Packet-aware totem/inventory synchronization with a bounded lethal-hit grace window.
+    # Requires PacketEvents 2.14.0+. Aliases: totemghost, totemfix.
+    enabled: false
+  custompearlvelocity:
+    enabled: false
+    # Multiplier for the initial throw speed (1.0 = vanilla).
+    # Practice servers often use 1.15 to 1.3 for easier catches.
+    velocity-multiplier: 1.145
+    # Extra upward velocity added on throw (0.0 = vanilla).
+    # Positive values give the pearl a higher arc.
+    y-boost: 0.125
+    # Simulates a change in gravity (1.0 = vanilla).
+    # 0.5 = 50% less gravity (pearls float further).
+    # 1.5 = 50% more gravity (pearls drop faster).
+    gravity-multiplier: 0.85
+  legacyprojectiles:
+    enabled: false
+    # NOTE: this is an approximation of pre-1.21.6 projectile behaviour, not an exact
+    # recreation of vanilla. It restores the old 0.3 block targeting margin, but hit
+    # results can still differ from vanilla in some situations.
+    # Which projectiles the mechanic affects.
+    #   blacklist (default): affect every projectile except the ones listed below.
+    #   whitelist: only affect the projectiles listed below.
+    # Use Bukkit entity type names (ARROW, SPECTRAL_ARROW, ENDER_PEARL, FISHING_BOBBER, ...).
+    # Arrows are blacklisted by default; remove them from the list to include them.
+    # Set entities to [] to affect every projectile in blacklist mode.
+    # Unknown names and non-projectile types are logged and skipped.
+    mode: blacklist
+    entities:
+      - ARROW
+      - SPECTRAL_ARROW
+  # Example: add ender pearls and fishing bobbers to the default arrow blacklist
+  #   mode: blacklist
+  #   entities:
+  #     - ARROW
+  #     - SPECTRAL_ARROW
+  #     - ENDER_PEARL
+  #     - FISHING_BOBBER
+  nospread:
+    enabled: false
+    # Which projectiles the mechanic affects.
+    #   blacklist (default): affect every projectile except the ones listed below.
+    #   whitelist: only affect the projectiles listed below.
+    # Use Bukkit entity type names (ARROW, SNOWBALL, ENDER_PEARL, FISHING_BOBBER, etc.).
+    mode: blacklist
+    entities: []
+  # Example: leave snowballs and eggs with their vanilla random spread
+  #   mode: blacklist
+  #   entities:
+  #     - SNOWBALL
+  #     - EGG
+  knockbacksync:
+    enabled: false
+  legacypearls:
+    # Pre-26.2 Ender Pearl momentum: the thrower keeps their exact velocity through the
+    # teleport instead of stopping for a tick. Requires PacketEvents 2.14.0+ for the
+    # zero-delay path; without it momentum is restored one tick late.
+    enabled: false
+  legacyknockback:
+    # Pre-1.19.4 explosion knockback (MC-198809).
+    # From 1.19.4 onwards, Blast Protection I-IV reduces explosion knockback by
+    # 15-60% instead of the pre-1.19.4 behaviour where it rounded away to nothing.
+    # Enabling this mechanic cancels that reduction, so Blast Protection no longer
+    # protects you from being launched by explosions.
+    enabled: false
+  consistentipc:
+    # Forces Instant Pearl Catches (IPC) to work 100% of the time by resolving vanilla's
+    # tick-order dependency and blocking useless "early hop" catches before tick 5.
+    # Requires PacketEvents 2.14.0+ for precise network-tick tracking.
+    # Works best when combined with legacyperls and nospread.
+    enabled: false
+  consistentdurability:
+    enabled: false
+  clumps:
+    enabled: true
+    # Radius in blocks within which orbs are merged.
+    merge-radius: 2.0
+    # Radius in blocks within which a player instantly absorbs orbs.
+    instant-collect-radius: 1.5
+    # Remove nearby orbs and give their XP directly to the player.
+    enable-instant-collect: true
+
+# Optional PvP world generator, selectable from Multiverse or any other world manager.
+#   /mv create <world> normal -g PvPCore:DESERT
+#   /mv create <world> normal -g PvPCore:PLAINS
+# The generator only affects worlds created with -g PvPCore:<BIOME_ID>.
+#
+# Every biome has independent surface settings. Underground blocks and features are shared:
+# vanilla-style bedrock/deepslate and Minecraft's overworld ore/blob feature table.
+# Caves, water, structures and generation-time mobs are disabled. Natural mob spawning is
+# disabled and the world border is applied automatically when a PvPCore world loads.
+# Terrain settings only affect chunks generated AFTER a /pvp-core reload.

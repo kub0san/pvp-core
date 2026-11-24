@@ -1,0 +1,49 @@
+# Warn when one of these worlds loads without the PvPCore generator.
+# Example: [pvp_arena, scrims]
+expected-worlds: []
+
+biomes:
+  desert:
+    # Rugged desert terrain with pronounced cliffs and smaller 4-6 chunk clusters,
+    # but with smoother, cleaner slopes.
+    surface-y: 64
+    tier-height: 16
+    slope-smoothness: 0.4
+    roughness: 0.3
+
+  plains:
+    # Varied PvP plains with 4-6 chunk clusters and interesting warping,
+    # but with smoother, more gradual slopes.
+    surface-y: 64
+    tier-height: 24
+    slope-smoothness: 0.4
+    roughness: 0.3
+
+  # Terrain tuning, shared by every biome.
+  # The ground is built from three height levels - low, mid and high - joined by slopes.
+  #
+  # surface-y         Height (Y) of the MID level; the base level everything else is measured from.
+  #                   Range: 40..200.
+  # tier-height       How far the low and high levels sit from the mid level.
+  #                   Bigger = taller hills and deeper dips. Range: 0..40.
+  # slope-smoothness  How long/wide the ramps between levels are.
+  #                   Bigger = gentler ramps; smaller = shorter, steeper ramps.
+  #                   Range: 0.03..0.5 (plains also accepts down to 0.01).
+  # roughness         How bumpy the surface is: plateau texture, ledges and floor noise.
+  #                   0 = clean and smooth, 1 = default, 3 = very rugged. Range: 0..3.
+  #
+  # Out-of-range values: surface-y is clamped to 40..200. The other three fall back to
+  # that biome's default (a warning is logged), so check the console if a value seems ignored.
+  # Legacy top-level desert terrain keys under "worldgen:" are still read when biomes.desert is absent.
+
+# Half-width in blocks. The generated square is rounded to chunk boundaries; outside is void.
+max-radius-blocks: 10000
+# World border diameter in blocks, applied to every PvPCore world on load and reload.
+world-border-diameter: 20000
+
+# Toggle natural features in PvPCore worlds (default: false)
+allow-mob-spawning: false
+allow-weather-cycle: false
+allow-locator-bar: false
+allow-day-cycle: false # When false, the day is frozen at day-time (below).
+day-time: 6000 # Ticks (0 dawn, 6000 noon, 12000 dusk, 18000 midnight). Used when allow-day-cycle is false.

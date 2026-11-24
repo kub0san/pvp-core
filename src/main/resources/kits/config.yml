@@ -1,0 +1,232 @@
+# Set to false to disable every kits feature without unloading PvPCore (commands, menus,
+# auto-regear, MOTD, queued broadcasts are all turned off). Applied on /pvp-core reload.
+# Older configs are backed up and migrated automatically.
+enabled: true
+config-version: 3
+
+storage:
+  type: sqlite # sqlite, mysql, postgresql, redis, yaml
+  backup:
+    enabled: true # SQLite and YAML only. Stored in backups/.
+  mysql:
+    host: localhost
+    port: '3306'
+    dbname: kitdatabase
+    username: username
+    password: pa55w0rd
+    use-ssl: false
+    maximum-pool-size: 10 # Maximum database connections.
+  postgresql:
+    host: localhost
+    port: '5432'
+    dbname: kitdatabase
+    username: username
+    password: pa55w0rd
+    use-ssl: false
+    maximum-pool-size: 10 # Maximum database connections.
+  redis:
+    host: localhost
+    port: 6379
+    password: pa55w0rd
+
+# Feature names below are fixed; entries use your existing world/region names.
+locations:
+  global: # All player features. Admin data tools stay available.
+    mode: deny # deny: everywhere except entries. allow: only entries.
+    entries: []
+# Entries are world names or "world:region". Regions require WorldGuard.
+# Feature rules add restrictions to global. Available feature names:
+# menu, kits, enderchests, public-kits, kit-room, sharing,
+# regear, heal, repair, rekit-respawn, rekit-kill.
+# regear:
+#   mode: deny
+#   entries:
+#     - world_nether # Whole world.
+#     - "world:protected_area" # One region in world.
+
+kits:
+  max-slots: 99 # 1-99. Applies to personal kits and enderchest kits.
+  load:
+    heal: false
+    feed: false
+    saturate: false
+    clear-effects: false
+    apply-potion-effects: true # NEW: Automatically applies potion effects from the kit
+
+enderchests:
+  load:
+    heal: false
+    feed: false
+    saturate: false
+    clear-effects: false
+
+# Last loaded kit and enderchest selections are saved in your configured storage.
+# In kits maps, keys are your world or "world:region" names; values are public kit IDs.
+rekit:
+  respawn:
+    enabled: false
+    delay-ticks: 0 # 0 uses the next tick; 20 waits one second.
+    restore-enderchest: false # Also restore the player's last loaded enderchest slot.
+    kits: {}
+  # Example: kits: {world_nether: crystal, "world:protected_area": sword}
+  kill:
+    enabled: false
+    restore-enderchest: false
+    kits: {}
+
+# Autosetup fills unsaved pages. Extra pages start empty.
+kitroom:
+  pages: 5 # 1-99. The default page count for fresh installs. (Editable in-game via /kitroom edit).
+
+# Keys below (crystal, mace, ...) are public kit IDs. Contents are saved separately.
+# Autosetup fills declared starter IDs.
+# /perplayerkit autosetup add-kits also adds missing bundled definitions.
+publickits:
+  crystal:
+    name: Crystal
+    icon: END_CRYSTAL
+  mace:
+    name: Mace
+    icon: MACE
+  netherite:
+    name: Netherite OP
+    icon: NETHERITE_SWORD
+  pot:
+    name: Pot
+    icon: SPLASH_POTION
+  uhc:
+    name: UHC
+    icon: GOLDEN_APPLE
+  sword:
+    name: Sword
+    icon: DIAMOND_SWORD
+  axe:
+    name: Axe
+    icon: DIAMOND_AXE
+  ffa:
+    name: FFA
+    icon: ENCHANTED_GOLDEN_APPLE
+  cart:
+    name: Cart
+    icon: TNT_MINECART
+
+# Existing stored definitions stay intact when filtered on use. /purgeitem removes items permanently.
+item-filter:
+  enabled: false
+  kit-room-only: false # Require each material to appear in an enabled kit room page.
+  filter-imports: true # Filter items copied into personal kit editors.
+  filter-saves: true # Filter new personal and enderchest kit saves too.
+  allow-unbreakable: false
+  allow-custom-attributes: false
+  allow-item-flags: true # Tooltip visibility flags, such as hiding enchantments.
+  enchantments:
+    allow-over-levelled: false # Use vanilla level limits unless max-levels overrides them.
+    allow-incompatible: false # Allow enchantments on invalid items or conflicting combinations.
+    max-levels: {}
+  potions: # Base and custom effects on potions and tipped arrows. Levels start at 1.
+    max-level: 0 # 0 means no cap.
+    max-duration-seconds: 0 # 0 means no cap; a positive cap also rejects infinite effects.
+    effects: {}
+  overrides: {}
+# Example:
+# overrides:
+#   NETHERITE_SWORD:
+#     enchantments:
+#       max-levels: {sharpness: 5}
+#   SPLASH_POTION:
+#     potions:
+#       max-duration-seconds: 90
+
+anti-exploit:
+  block-spaces-in-commands: false
+  prevent-shulkers-dropping-items: false # Remove dropped shulker boxes when they take damage.
+
+regear:
+  modes: # command (instant), shulker (GUI), or hybrid (gives shulker, place to regear directly).
+    rg: hybrid
+    regear: hybrid
+  command-cooldown-seconds: 0 # Command mode only.
+  damage-cooldown-seconds: 0 # Wait after taking damage.
+  allow-while-using-elytra: false
+  prevent-putting-items-in-regear-inventory: false
+  restore-exact-positions: true # Wipes the inventory so the kit restores exactly (respects whitelist).
+  invert-whitelist: true # true excludes the listed materials instead.
+  whitelist: # With []: false restocks nothing; true allows all materials.
+    - TOTEM_OF_UNDYING
+    - RESPAWN_ANCHOR
+    - FIREWORK_ROCKET
+  # Meta-aware additions to whitelist (merged, never replace it). Each entry matches a material
+  # plus all listed criteria; enchantment levels are exact. Example: keep only a Sharpness V sword.
+  # rules:
+  #   DIAMOND_SWORD:
+  #     enchantments:
+  #       'minecraft:sharpness': 5
+  #     unbreakable: false
+  #     potion-type: minecraft:healing
+  rules: {} # Replace this empty map with the rules block above to add meta-aware rules.
+  restore-armor: false # Also restore armor slots 36-39 (kit layout, blacklist-aware).
+  restore-offhand: false # Also restore the offhand slot 40.
+  overflow:
+    # Where items that regear would otherwise delete go: drop (default), enderchest, or block.
+    # block refuses the entire regear when anything would be lost; nothing is changed.
+    action: drop
+
+heal:
+  clear-effects: false
+
+death:
+  condensed-drops: false
+
+updates:
+  notify-admins-on-join: false # Update checks run in the background.
+
+motd:
+  enabled: false
+  delay-seconds: 5
+
+broadcasts:
+  enabled: true # Master switch for action messages. Scheduled announcements are separate.
+  use-display-name: false
+  scheduled:
+    enabled: false
+    period-seconds: 90
+  actions: # Each permission selects who receives that message.
+    player-repaired:
+      enabled: true
+      permission: perplayerkit.kitnotify
+    player-healed:
+      enabled: true
+      permission: perplayerkit.kitnotify
+    player-opened-kit-room:
+      enabled: true
+      permission: perplayerkit.kitnotify
+    player-loaded-private-kit:
+      enabled: true
+      permission: perplayerkit.kitnotify
+    player-loaded-public-kit:
+      enabled: true
+      permission: perplayerkit.kitnotify
+    player-loaded-enderchest:
+      enabled: true
+      permission: perplayerkit.kitnotify
+    player-copied-kit:
+      enabled: true
+      permission: perplayerkit.kitnotify
+    player-copied-ec:
+      enabled: true
+      permission: perplayerkit.kitnotify
+    player-regeared:
+      enabled: true
+      permission: perplayerkit.kitnotify
+
+interface:
+  glass-material: LIGHT_BLUE_STAINED_GLASS_PANE
+  main-color: <#6ea8d9>
+
+sounds:
+  enabled: true
+  success: ENTITY_PLAYER_LEVELUP
+  failure: ENTITY_ITEM_BREAK
+  click: UI_BUTTON_CLICK
+  open-gui: UI_BUTTON_CLICK
+  close-gui: UI_BUTTON_CLICK

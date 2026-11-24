@@ -1,0 +1,147 @@
+package org.pvpcore.gui.base;
+
+import org.pvpcore.features.kits.KitContents;
+
+/**
+ * Slot and row constants for the GUI. Navigation screens are
+ * "top frame + content rows + dock" (see {@link GuiDock} / {@link GuiFrame.Density#BORDER});
+ * editors, the kit room and the preview are fixed full-canvas layouts whose slot
+ * contracts are listed here and verified by {@link GuiLayoutChecks}.
+ */
+public final class GuiLayouts {
+    private GuiLayouts() {
+    }
+
+    public static final int COLUMNS = 9;
+
+    /**
+     * First content row on {@link GuiFrame.Density#BORDER} screens.
+     * Row 0 is the top glass frame.
+     */
+    public static final int BORDER_CONTENT_START = 1;
+
+    /** Absolute row for the {@code relative}-th content row on a bordered screen. */
+    public static int contentRow(int relative) {
+        return BORDER_CONTENT_START + relative;
+    }
+
+    // ---- Premade kits (tabs sit on the first content row) ----
+    public static final int TABS_ROW = BORDER_CONTENT_START;
+    public static final int PREMADE_CONTENT_ROW_ONE = BORDER_CONTENT_START + 1;
+
+    // ---- Editors ----
+    /** Total slots of a 6-row chest. */
+    public static final int MENU_SIZE = 54;
+
+    /** First slot of the footer row (row 5) of a 6-row editor. */
+    public static final int FOOTER_START = 45;
+
+    /** Kit layout content: slots 0-40 (36 main inventory plus 5 armor). */
+    public static final int KIT_CONTENT_START = 0;
+    public static final int KIT_CONTENT_END = KitContents.INVENTORY_SIZE; // 41, exclusive
+
+    /** Ender chest layout content: slots 9-35. */
+    public static final int EC_CONTENT_START = 9;
+    public static final int EC_CONTENT_END = EC_CONTENT_START + KitContents.ENDERCHEST_SIZE; // 36, exclusive
+
+    /**
+     * Kit layouts keep boots, leggings, chestplate, helmet and offhand in
+     * row 4, columns 0-4. The divider therefore starts at column 5 for a kit
+     * editor; it is never a full row there.
+     */
+    public static final int EDITOR_ARMOR_SLOT_START = 36;
+    public static final int EDITOR_ARMOR_SLOT_END = 41; // exclusive
+    public static final int EDITOR_DIVIDER_FIRST_COL = 5;
+
+    /** Divider row used by editors whose row 4 is free (EC layouts). */
+    public static final int EDITOR_DIVIDER_ROW = 4;
+    /** Footer row shared by every editor. */
+    public static final int EDITOR_FOOTER_ROW = 5;
+
+    /** The editor footer contract, as absolute slots of row 5. */
+    public static final int EDITOR_LABEL_START = 45; // armor labels, columns 0-4
+    public static final int EDITOR_MODE_SLOT = 50;
+    public static final int EDITOR_IMPORT_SLOT = 51;
+    public static final int EDITOR_CLEAR_SLOT = 52;
+    public static final int EDITOR_BACK_SLOT = 53;
+
+    // ---- Kit room item editor: rows 0-4 are all content ----
+    public static final int KIT_ROOM_CONTENT_START = 0;
+    public static final int KIT_ROOM_CONTENT_END = KitContents.ROOM_SIZE; // 45, exclusive; row 5 is the footer
+
+    /** The kit-room page list shows 18 pages, on the two content rows under the top frame. */
+    public static final int KIT_ROOM_PAGES_PER_SCREEN = 18;
+
+    // ---- Kit room editor footer ----
+    public static final int FOOTER_SAVE_COL = 8;
+
+    // ---- Total chest rows per screen type ----
+    public static final int ROWS_CONFIRM = 4;
+    public static final int ROWS_EDITOR = 6;
+    public static final int ROWS_PREVIEW = 5;
+
+    // ---- Public kit preview (5 rows, full canvas) ----
+    /**
+     * Row 4 of the preview: cols 0-4 hold the kit's armor (written straight
+     * into the inventory), cols 5-6 are the only free cells and hold the
+     * filler, cols 7-8 hold Back and Load. Nothing else may be painted in
+     * that row, or a redraw would wipe the armor.
+     */
+    public static final int PREVIEW_FILLER_FIRST_COL = 5;
+    public static final int PREVIEW_FILLER_LAST_COL = 6;
+    /** Back and Load sit in the last two slots of the last row. */
+    public static final int PREVIEW_BACK_SLOT = (ROWS_PREVIEW - 1) * COLUMNS + COLUMNS - 2; // 43
+    public static final int PREVIEW_LOAD_SLOT = (ROWS_PREVIEW - 1) * COLUMNS + COLUMNS - 1; // 44
+
+    // ---- Bordered dock layouts: top frame + content + dock ----
+    /** Top frame, kits, ender chests, quick actions, dock. */
+    public static final int ROWS_DASHBOARD = 5;
+    public static final int DASH_KITS_ROW = BORDER_CONTENT_START;
+    public static final int DASH_ENDERCHESTS_ROW = BORDER_CONTENT_START + 1;
+    public static final int DASH_ACTIONS_ROW = BORDER_CONTENT_START + 2;
+    public static final int DASH_DOCK_ROW = ROWS_DASHBOARD - 1;
+    /** Slots shown per page on the dashboard (one row). */
+    public static final int DASH_SLOTS_PER_PAGE = COLUMNS;
+
+    /**
+     * Framed tool strip: top frame, breathing room, tools, dock.
+     * Tools are centered on {@link #contentRow}(1).
+     */
+    public static final int ROWS_DOCK_TOOLS = 5;
+    public static final int DOCK_TOOLS_ROW = BORDER_CONTENT_START + 1;
+
+    /** Top frame, two content rows, dock (page list, settings hub). */
+    public static final int ROWS_DOCK_LIST18 = rowsFor(2);
+    /** Top frame, three content rows, dock (settings group / list, RTP management). */
+    public static final int ROWS_DOCK_LIST27 = rowsFor(3);
+    /** Top frame, tabs + two kit rows, dock. */
+    public static final int ROWS_PREMADE_DOCK = rowsFor(3);
+    public static final int PREMADE_KITS_PER_PAGE_DOCK = 2 * COLUMNS;
+    public static final int DOCK_ACTION_COL_A = 7;
+    public static final int DOCK_ACTION_COL_B = 8;
+
+    /** Content rows plus top frame plus dock, clamped to a valid chest size. */
+    public static int rowsFor(int contentRows) {
+        return Math.max(3, Math.min(6, contentRows + 2));
+    }
+
+    /**
+     * Centres a list of items in a row, perfectly.
+     * Uses a step of 2 (gaps between items) if they fit, otherwise squeezes them.
+     */
+    public static void centerItems(com.github.stefvanschie.inventoryframework.pane.StaticPane pane,
+                                   java.util.List<com.github.stefvanschie.inventoryframework.gui.GuiItem> items,
+                                   int row) {
+        int count = items.size();
+        if (count == 0) return;
+
+        // If we can fit with a 1-slot gap between each item (e.g. 4 items = 7 width), do it.
+        int step = (count * 2 - 1) <= COLUMNS ? 2 : 1;
+        int width = (count - 1) * step + 1;
+        int startCol = (COLUMNS - width) / 2;
+
+        for (int i = 0; i < count; i++) {
+            pane.addItem(items.get(i), startCol + (i * step), row);
+        }
+    }
+}
