@@ -36,13 +36,19 @@ public final class CoreConfigLoader {
 
         Path path = file.toPath();
         YamlConfiguration config;
+        boolean unreadable = false;
         try {
             config = ConfigFiles.read(path);
         } catch (java.io.IOException e) {
-            throw new RuntimeException("Could not read " + relativePath + ": " + e.getMessage(), e);
+            // A malformed admin file must not take down the owning module. Keep the file
+            // untouched so its data can still be repaired, and run with bundled defaults.
+            plugin.getLogger().warning("Could not read " + relativePath
+                    + " (using bundled defaults): " + e.getMessage());
+            config = new YamlConfiguration();
+            unreadable = true;
         }
 
-        boolean changed = !existed;
+        boolean changed = !existed && !unreadable;
 
         for (String key : removedKeys) {
             if (config.contains(key)) {
@@ -67,7 +73,7 @@ public final class CoreConfigLoader {
             plugin.getLogger().warning("Could not read default " + relativePath + " from jar: " + e.getMessage());
         }
 
-        if (changed) {
+        if (changed && !unreadable) {
             try {
                 ConfigFiles.write(config, path);
             } catch (java.io.IOException e) {
@@ -75,7 +81,9 @@ public final class CoreConfigLoader {
             }
         }
 
-        return new LoadResult(config, changed);
+        // An unreadable admin file was not actually updated, even though bundled defaults
+        // were merged into the in-memory config.
+        return new LoadResult(config, changed && !unreadable);
     }
 
     public static void save(JavaPlugin plugin, String relativePath, FileConfiguration config) {
