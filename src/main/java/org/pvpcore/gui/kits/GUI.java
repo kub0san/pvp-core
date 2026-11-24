@@ -20,6 +20,7 @@ import org.pvpcore.gui.base.GuiSessions;
 
 import org.pvpcore.features.kits.ItemFilter;
 import org.pvpcore.features.kits.KitManager;
+import org.pvpcore.features.kits.cosmetics.CustomizeSession;
 import org.pvpcore.features.kits.Kits;
 import org.pvpcore.features.kits.KitsContext;
 import org.pvpcore.commands.kits.core.ActionGuards;
@@ -55,6 +56,9 @@ public class GUI implements GuiSession {
     private static final Map<UUID, EditorContext> editorContexts = new HashMap<>();
     private static final Map<UUID, Integer> lastMainMenuPage = new HashMap<>();
     private final Map<UUID, Map<String, org.pvpcore.gui.base.GuiSettingsSupport.Staged>> stagedSettings = new ConcurrentHashMap<>();
+    // Instance state, per ADR 0008: pending rename/chat operations and reload invalidation.
+    private final Map<UUID, PendingCustomize> pendingCustomize = new ConcurrentHashMap<>();
+    private final Set<UUID> staleCustomize = ConcurrentHashMap.newKeySet();
 
     public static boolean takeClearFlag(Player player) { return clearedEditors.remove(player.getUniqueId()); }
     public static void markKitDeleted(Player player) { kitDeletionFlag.add(player.getUniqueId()); }
@@ -87,11 +91,77 @@ public class GUI implements GuiSession {
         PremadePage.forget(player);
         if (instance != null) {
             instance.stagedSettings.remove(player);
+            instance.clearPendingCustomize(player);
         }
     }
 
     public static void setEditorContext(Player viewer, EditorContext context) {
         editorContexts.put(viewer.getUniqueId(), context);
+    }
+
+    // ------------------------------------------------------------------ pending cosmetic sessions
+
+    /** A pending chat/async operation for one viewer, identified so stale callbacks are ignored. */
+    public static final class PendingCustomize {
+        private final UUID operationId;
+        private final CustomizeSession session;
+        private volatile boolean stale;
+
+        private PendingCustomize(UUID operationId, CustomizeSession session) {
+            this.operationId = operationId;
+            this.session = session;
+        }
+
+        public UUID operationId() { return operationId; }
+        public CustomizeSession session() { return session; }
+        public boolean stale() { return stale; }
+        private void markStale() { stale = true; }
+    }
+
+    /** Stores a session for an async prompt and returns the id the callback must present. */
+    public UUID setPendingCustomize(UUID viewer, CustomizeSession session) {
+        if (viewer == null) throw new IllegalArgumentException("viewer");
+        if (session == null) throw new IllegalArgumentException("session");
+        UUID operationId = UUID.randomUUID();
+        pendingCustomize.put(viewer, new PendingCustomize(operationId, session));
+        staleCustomize.remove(viewer);
+        return operationId;
+    }
+
+    /** Takes the session only when the operation id matches; stale/mismatched callbacks get null. */
+    public CustomizeSession takePendingCustomize(UUID viewer, UUID operationId) {
+        if (viewer == null || operationId == null) return null;
+        PendingCustomize pending = pendingCustomize.get(viewer);
+        if (pending == null || pending.stale() || !operationId.equals(pending.operationId())) return null;
+        pendingCustomize.remove(viewer, pending);
+        return pending.session();
+    }
+
+    public void clearPendingCustomize(UUID viewer) {
+        if (viewer == null) return;
+        pendingCustomize.remove(viewer);
+        staleCustomize.remove(viewer);
+    }
+
+    /** A reload invalidates every pending operation; later Apply calls must be rejected. */
+    public void invalidateCustomizeSessions() {
+        for (Map.Entry<UUID, PendingCustomize> entry : pendingCustomize.entrySet()) {
+            entry.getValue().markStale();
+            staleCustomize.add(entry.getKey());
+        }
+        pendingCustomize.clear();
+    }
+
+    public boolean isCustomizeStale(UUID viewer) {
+        return viewer != null && staleCustomize.contains(viewer);
+    }
+
+    public void markCustomizeStale(UUID viewer) {
+        if (viewer != null) staleCustomize.add(viewer);
+    }
+
+    public void clearCustomizeStale(UUID viewer) {
+        if (viewer != null) staleCustomize.remove(viewer);
     }
 
     /** Saves the editor the player still has open (if any) before another screen opens. */
@@ -265,6 +335,9 @@ public class GUI implements GuiSession {
         clearedEditors.clear();
         if (instance != null) {
             instance.stagedSettings.clear();
+            // Pending operations die with the instance; the stale markers stay so an old screen
+            // held by a live callback can still reject Apply after a reload.
+            instance.pendingCustomize.clear();
         }
         GuiChatPrompt.clear();
         GuiSessions.clear();
