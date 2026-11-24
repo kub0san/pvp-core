@@ -34,12 +34,12 @@ dependencies {
     compileOnly("org.mvplugins.multiverse.core:multiverse-core:5.8.1")
 
     // Kits module (merged PerPlayerKit) dependencies.
-    implementation("org.ipvp:canvas:1.3.1")
     implementation("com.github.stefvanschie.inventoryframework:IF:0.12.2")
-    implementation("redis.clients:jedis:5.1.0")
     implementation("com.zaxxer:HikariCP:5.1.0")
     // SQLite JDBC driver: HikariCP configures org.sqlite.JDBC explicitly, but nothing on the
     // runtime/shaded classpath provided it, so every kits storage connection failed at enable.
+    // The default artifact bundles natives for ~17 OS/arch combinations (11 MB of the jar);
+    // shadowJar below keeps only the x86_64 binaries for Linux and Windows.
     implementation("org.xerial:sqlite-jdbc:3.54.1.0")
     implementation("net.kyori:adventure-platform-bukkit:4.3.2")
     compileOnly("com.sk89q.worldguard:worldguard-bukkit:7.0.9")
@@ -47,10 +47,6 @@ dependencies {
 
     // Command framework (shaded). See https://docs.commandapi.dev/dev-setup/shading.html
     implementation("dev.jorel:commandapi-paper-shade:12.1.0")
-
-    // Configurate (SpongePowered) for configuration loading/serialization.
-    implementation("org.spongepowered:configurate-yaml:4.2.0")
-    implementation("org.spongepowered:configurate-core:4.2.0")
 
     // Unit tests: MockBukkit v1.21 targets Paper 1.21.11 and emits Java 21 bytecode,
     // matching this plugin's runtime target. Packet/GUI behaviour still needs a real server.
@@ -69,9 +65,10 @@ java {
     toolchain.languageVersion = JavaLanguageVersion.of(25)
 }
 
-// Kits bundles Canvas, OkHttp, Jedis, HikariCP and adventure-platform, so the distributed
-// plugin is the shaded jar. Disable the plain jar: it writes the same filename and would
-// otherwise replace the shaded jar (dropping bundled dependencies and resources) during build.
+// The plugin ships its runtime dependencies (HikariCP, SQLite JDBC, Adventure,
+// InventoryFramework, CommandAPI) inside a shaded jar. Disable the plain jar: it writes the
+// same filename and would otherwise replace the shaded jar (dropping bundled dependencies
+// and resources) during build.
 tasks.jar {
     enabled = false
 }
@@ -80,6 +77,17 @@ tasks.shadowJar {
     archiveClassifier.set("")
     relocate("com.github.stefvanschie.inventoryframework", "org.pvpcore.inventoryframework")
     relocate("dev.jorel.commandapi", "org.pvpcore.libs.commandapi")
+
+    // sqlite-jdbc ships a native library for every OS/arch it supports (~11 MB compressed).
+    // The plugin only needs the ones for the machines it actually runs on: the Linux x86_64
+    // production server and the Windows x86_64 local test server. Anything else (ARM, musl,
+    // FreeBSD, macOS) is dropped. Kits storage will fail on those platforms unless a matching
+    // native is supplied externally via java.library.path.
+    exclude { element ->
+        element.path.startsWith("org/sqlite/native/") &&
+            !element.path.startsWith("org/sqlite/native/Linux/x86_64/") &&
+            !element.path.startsWith("org/sqlite/native/Windows/x86_64/")
+    }
 }
 
 tasks.named("build") { dependsOn("shadowJar") }
