@@ -25,7 +25,11 @@ import org.bukkit.Material;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.entity.Player;
+import org.bukkit.event.HandlerList;
+import org.bukkit.event.Listener;
+import org.bukkit.plugin.Plugin;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
@@ -51,6 +55,9 @@ final class KitsLifecycle {
 
     /** Keep‑alive task handle; cancelled on disable so the DB can close cleanly. */
     private volatile ScheduledTask keepAliveTask;
+
+    /** Listener instances registered by this module, retained so rollback can unregister them. */
+    private final List<Listener> registeredListeners = new ArrayList<>();
 
     // ---------------------------------------------------------------------
     // Enable
@@ -116,6 +123,10 @@ final class KitsLifecycle {
             }
 
             initManagers(Kits.context);
+            KitManager recovered = Kits.context.kitManager();
+            if (recovered != null) {
+                recovered.replayFailedWrites();
+            }
             loadPublicKitsIdsFromConfig(Kits.context);
             Kits.plugin.getLogger().info("Public Kit Configuration Loaded");
 
@@ -250,7 +261,11 @@ final class KitsLifecycle {
             keepAliveTask = null;
         }
 
-        // 2. Tear down commands.
+        // 2. Tear down commands and listeners. Bukkit unregisters on plugin disable, but a
+        // failed enable rolls back without disabling the plugin, so these must be explicit.
+        unregisterListeners();
+
+        // 3. Tear down commands.
         if (Kits.plugin instanceof PvPCorePlugin p) {
             org.pvpcore.commands.kits.KitsCommands.disableBukkitCommands(p, Kits.context);
         } else {
@@ -260,7 +275,7 @@ final class KitsLifecycle {
             }
         }
 
-        // 3. Tear down features in reverse dependency order.
+        // 4. Tear down features in reverse dependency order.
         quietShutdown("UpdateChecker", () -> {
             if (kits.updateChecker != null) kits.updateChecker.close();
         });
@@ -283,11 +298,11 @@ final class KitsLifecycle {
         quietShutdown("BroadcastManager",   BroadcastManager::shutdown);
         quietShutdown("GUI",                org.pvpcore.gui.kits.GUI::shutdown);
 
-        // 4. Close storage last.
+        // 5. Close storage last.
         closeDatabaseConnection(kits);
         Kits.storageManager = null;
 
-        // 5. Clear static state so the old classloader can be GC'd on /reload.
+        // 6. Clear static state so the old classloader can be GC'd on /reload.
         kits.updateChecker = null;
         kits.backupManager = null;
         Kits.config = null;
@@ -463,24 +478,34 @@ final class KitsLifecycle {
     }
 
     private void registerListeners(Kits kits, KitsContext ctx) {
-        Bukkit.getPluginManager().registerEvents(
-                new JoinListener(Kits.plugin, ctx, kits.updateChecker),
-                Kits.plugin);
-
-        Bukkit.getPluginManager().registerEvents(new QuitListener(Kits.plugin, ctx), Kits.plugin);
-        Bukkit.getPluginManager().registerEvents(new KitMenuCloseListener(ctx), Kits.plugin);
-        Bukkit.getPluginManager().registerEvents(new AutoRekitListener(Kits.plugin, ctx), Kits.plugin);
+        registerListener(new JoinListener(Kits.plugin, ctx, kits.updateChecker), Kits.plugin);
+        registerListener(new QuitListener(Kits.plugin, ctx), Kits.plugin);
+        registerListener(new KitMenuCloseListener(ctx), Kits.plugin);
+        registerListener(new AutoRekitListener(Kits.plugin, ctx), Kits.plugin);
 
         FileConfiguration cfg = ctx.config();
         if (cfg != null && cfg.getBoolean("death.condensed-drops", false)) {
-            Bukkit.getPluginManager().registerEvents(new OldDeathDropListener(), Kits.plugin);
+            registerListener(new OldDeathDropListener(), Kits.plugin);
         }
         if (cfg != null && cfg.getBoolean("anti-exploit.block-spaces-in-commands", false)) {
-            Bukkit.getPluginManager().registerEvents(new CommandListener(), Kits.plugin);
+            registerListener(new CommandListener(), Kits.plugin);
         }
         if (cfg != null && cfg.getBoolean("anti-exploit.prevent-shulkers-dropping-items", false)) {
-            Bukkit.getPluginManager().registerEvents(new ShulkerDropItemsListener(), Kits.plugin);
+            registerListener(new ShulkerDropItemsListener(), Kits.plugin);
         }
+    }
+
+    void registerListener(Listener listener, Plugin plugin) {
+        Bukkit.getPluginManager().registerEvents(listener, plugin);
+        registeredListeners.add(listener);
+    }
+
+    /** Unregisters only listeners owned by this module; needed on a failed-enable rollback. */
+    void unregisterListeners() {
+        for (Listener listener : registeredListeners) {
+            HandlerList.unregisterAll(listener);
+        }
+        registeredListeners.clear();
     }
 
     /**
