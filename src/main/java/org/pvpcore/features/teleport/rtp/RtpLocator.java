@@ -167,6 +167,9 @@ final class RtpLocator {
             if (bounds.effectiveMax() <= 0) {
                 stats.countReject(RtpSearchStats.Reject.OUT_OF_BOUNDS);
                 finish();
+                // Terminal early return: no timeout is scheduled yet, so the future would
+                // never complete and callers (and RtpService search counters) would hang.
+                result.complete(null);
                 return;
             }
             if (settings.debug()) {
