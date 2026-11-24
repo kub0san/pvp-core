@@ -49,7 +49,9 @@ public class SQLite implements StorageManager, BackupCapable {
 
     private final Plugin plugin;
     private final String databasePath;
-    private HikariDataSource dataSource;
+    // getConnection() may be called from the async storage worker and from main-thread reads;
+    // both can observe "not connected" at once and must not each create a pool.
+    private volatile HikariDataSource dataSource;
 
     public SQLite(Plugin plugin) {
         this.plugin = plugin;
@@ -62,7 +64,7 @@ public class SQLite implements StorageManager, BackupCapable {
     }
 
     @Override
-    public void connect() throws StorageConnectionException {
+    public synchronized void connect() throws StorageConnectionException {
         if (isConnected()) {
             return;
         }
@@ -133,7 +135,7 @@ public class SQLite implements StorageManager, BackupCapable {
     }
 
     @Override
-    public void close() throws StorageConnectionException {
+    public synchronized void close() throws StorageConnectionException {
         if (!isConnected()) {
             return;
         }
@@ -185,7 +187,7 @@ public class SQLite implements StorageManager, BackupCapable {
         } catch (SQLException | StorageConnectionException e) {
             throw new KitStorageException(READ, kitID, e);
         }
-        return "Error";
+        return null; // no row is a normal miss; real failures throw KitStorageException above
     }
 
     @Override

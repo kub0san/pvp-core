@@ -32,9 +32,11 @@ public final class StorageWorkQueue implements AutoCloseable {
     public void close() {
         executor.shutdown();
         try {
-            // Wait max 5 seconds for queued writes to finish
-            if (!executor.awaitTermination(5, TimeUnit.SECONDS)) {
-                executor.shutdownNow(); // Force kill
+            // Every already-submitted write must finish before the storage layer closes;
+            // forcibly interrupting the worker here silently drops queued kit saves.
+            if (!executor.awaitTermination(30, TimeUnit.SECONDS)) {
+                logger.warning("Storage work queue did not drain within 30s; remaining writes may be lost");
+                executor.shutdownNow();
             }
         } catch (InterruptedException e) {
             executor.shutdownNow();

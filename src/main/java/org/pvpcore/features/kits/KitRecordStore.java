@@ -57,7 +57,7 @@ final class KitRecordStore {
     }
 
     static boolean isStoredData(String data) {
-        return data != null && !data.equalsIgnoreCase("error") && !DELETED.equals(data);
+        return data != null && !DELETED.equals(data);
     }
 
     static ItemStack[] decodeKit(String data, int size) throws IOException {

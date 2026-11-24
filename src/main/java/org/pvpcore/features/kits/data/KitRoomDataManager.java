@@ -310,7 +310,7 @@ public class KitRoomDataManager {
             String input = storageManager().getKitDataByID(IDUtil.getKitRoomId(i));
 
             // Safely ignore empty, error, or tombstoned pages
-            if (input == null || input.equalsIgnoreCase("error") || input.equals("!delete")) {
+            if (input == null || input.equals("!delete")) {
                 continue;
             }
 

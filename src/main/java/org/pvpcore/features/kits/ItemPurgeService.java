@@ -90,7 +90,7 @@ public class ItemPurgeService {
             processed++;
             try {
                 String data = storage.getKitDataByID(id);
-                if (data == null || data.equalsIgnoreCase("error")) {
+                if (data == null) {
                     continue;
                 }
                 scanned++;

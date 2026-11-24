@@ -193,6 +193,6 @@ public class KitDataService {
     }
 
     private static boolean isPresent(String data) {
-        return data != null && !data.equalsIgnoreCase("error");
+        return data != null;
     }
 }
