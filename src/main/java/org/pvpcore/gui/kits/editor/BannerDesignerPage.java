@@ -2,12 +2,14 @@ package org.pvpcore.gui.kits.editor;
 
 import com.github.stefvanschie.inventoryframework.gui.GuiItem;
 import com.github.stefvanschie.inventoryframework.pane.StaticPane;
+import org.bukkit.DyeColor;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
-import org.pvpcore.features.kits.cosmetics.BannerDesign;
-import org.pvpcore.features.kits.cosmetics.CosmeticValidator;
 import org.pvpcore.config.kits.CustomizeRules;
+import org.pvpcore.features.kits.cosmetics.BannerDesign;
+import org.pvpcore.features.kits.cosmetics.CosmeticApplier;
+import org.pvpcore.features.kits.cosmetics.CosmeticValidator;
 import org.pvpcore.features.kits.cosmetics.CustomizeSession;
 import org.pvpcore.gui.base.GuiGuard;
 import org.pvpcore.gui.base.GuiLayouts;
@@ -17,6 +19,9 @@ import org.pvpcore.gui.kits.GUI;
 import org.pvpcore.util.kits.LocationFeature;
 import org.pvpcore.util.kits.SoundManager;
 
+import java.util.List;
+import java.util.Locale;
+
 /**
  * Dedicated full-canvas shield banner designer. Stages a {@link BannerDesign} onto the
  * session's shield target; Apply here only stages (the main Customize screen commits).
@@ -24,33 +29,51 @@ import org.pvpcore.util.kits.SoundManager;
 public final class BannerDesignerPage extends GuiScreen {
     private final GUI gui;
     private final CustomizeSession session;
+    private final int kitSlot;
     private BannerDesign design;
-    private BannerDesign original;
+    private final BannerDesign original;
+    private int selectedLayer = -1;
 
-    private BannerDesignerPage(GUI gui, Player player, CustomizeSession session) {
+    private BannerDesignerPage(GUI gui, Player player, CustomizeSession session, int kitSlot,
+                               BannerDesign initial) {
         super(gui, player, GuiLayouts.ROWS_EDITOR, org.pvpcore.gui.base.GuiFrame.Density.NONE,
                 "perplayerkit.kit", LocationFeature.KITS);
         this.gui = gui;
         this.session = session;
-        this.design = BannerDesign.from(session.target() == null ? new ItemStack(Material.SHIELD) : session.target());
-        this.original = this.design;
+        this.kitSlot = kitSlot;
+        ItemStack target = session.target();
+        BannerDesign fromShield = BannerDesign.from(
+                target == null ? new ItemStack(Material.SHIELD) : target);
+        this.original = fromShield;
+        this.design = initial == null ? fromShield : initial;
+        gui.registerCustomizeScreen(player.getUniqueId());
     }
 
-    public static void open(GUI gui, Player player, CustomizeSession session) {
-        if (session == null) return;
-        if (!org.pvpcore.commands.kits.core.ActionGuards.allowed(player, "perplayerkit.kit", LocationFeature.KITS)) return;
-        if (session.target() == null || session.target().getType() != Material.SHIELD) {
+    /** Fresh designer: start from the shield's current design. */
+    public static void open(GUI gui, Player player, CustomizeSession session, int kitSlot) {
+        open(gui, player, session, kitSlot, null);
+    }
+
+    /** Reopen with the live design (pattern-picker return); {@code design} is never null here. */
+    public static void open(GUI gui, Player player, CustomizeSession session, int kitSlot,
+                            BannerDesign design) {
+        if (session == null || player == null || gui == null) return;
+        if (!org.pvpcore.commands.kits.core.ActionGuards.allowed(
+                player, "perplayerkit.kit", LocationFeature.KITS)) return;
+        ItemStack target = session.target();
+        if (target == null || target.getType() != Material.SHIELD) {
             gui.kits().lang().send(player, "error.cosmetics-not-shield");
             return;
         }
-        ItemStack target = session.target();
-        CosmeticValidator validator = new CosmeticValidator(CustomizeRules.parse(
-                gui.kits().config().getConfigurationSection("customize")));
-        if (validator.hasUnreadableBannerLayers(target)) {
+        if (new CosmeticValidator(rulesOf(gui)).hasUnreadableBannerLayers(target)) {
             gui.kits().lang().send(player, "error.cosmetics-banner-locked");
             return;
         }
-        new BannerDesignerPage(gui, player, session).show();
+        new BannerDesignerPage(gui, player, session, kitSlot, design).show();
+    }
+
+    private static CustomizeRules rulesOf(GUI gui) {
+        return CustomizeRules.parse(gui.kits().config().getConfigurationSection("customize"));
     }
 
     @Override
@@ -60,52 +83,151 @@ public final class BannerDesignerPage extends GuiScreen {
 
     @Override
     protected void renderContent(StaticPane content) {
+        List<BannerDesign.Layer> layers = design.layers();
+        for (int i = 0; i < layers.size() && i <= GuiLayouts.BANNER_LAYERS_LAST - GuiLayouts.BANNER_LAYERS_FIRST; i++) {
+            BannerDesign.Layer layer = layers.get(i);
+            ItemStack icon = bannerIcon(layer.dye(),
+                    GuiTheme.dim("Layer " + (i + 1)) + " " + GuiTheme.hint("Click", "edit"));
+            if (i == selectedLayer) icon = GuiTheme.glow(icon);
+            final int index = i;
+            content.addItem(wrap(icon, (p, e) -> {
+                SoundManager.playClick(p);
+                selectedLayer = index;
+                // Editing returns through the picker's open(..., design) overload.
+                BannerPatternPickerPage.open(gui, p, design, index, session, kitSlot);
+            }, player), (GuiLayouts.BANNER_LAYERS_FIRST + i) % GuiLayouts.COLUMNS,
+                    (GuiLayouts.BANNER_LAYERS_FIRST + i) / GuiLayouts.COLUMNS);
+        }
     }
 
     @Override
     protected void renderChrome(StaticPane chrome) {
-        // Template slot (ghost) + preview
-        chrome.addItem(new GuiItem(new ItemStack(Material.WHITE_BANNER)), GuiLayouts.BANNER_TEMPLATE_SLOT % GuiLayouts.COLUMNS,
+        // Template slot (virtual ghost) + preview.
+        chrome.addItem(new GuiItem(new ItemStack(Material.WHITE_BANNER)),
+                GuiLayouts.BANNER_TEMPLATE_SLOT % GuiLayouts.COLUMNS,
                 GuiLayouts.BANNER_TEMPLATE_SLOT / GuiLayouts.COLUMNS);
         ItemStack preview = new ItemStack(Material.SHIELD);
-        try { design.applyTo(preview); } catch (RuntimeException ignored) { }
+        try {
+            preview = design.applyTo(preview);
+        } catch (RuntimeException ignored) {
+            // Preview is cosmetic; a bad design must never break the screen.
+        }
         chrome.addItem(new GuiItem(preview), GuiLayouts.BANNER_PREVIEW_SLOT % GuiLayouts.COLUMNS,
                 GuiLayouts.BANNER_PREVIEW_SLOT / GuiLayouts.COLUMNS);
 
-        // Back
-        chrome.addItem(wrap(GuiTheme.back(), (p, e) -> {
+        // Base colour: an explicit click cycles to the next dye, then back to unset.
+        chrome.addItem(wrap(bannerIcon(design.baseColor() == null ? DyeColor.WHITE : design.baseColor(),
+                GuiTheme.dim("Base colour"), GuiTheme.hint("Click", "cycle")), (p, e) -> {
             SoundManager.playClick(p);
-            CustomizePage.reopen(gui, p, 0, session);
-        }, player), GuiLayouts.BANNER_BACK_SLOT % GuiLayouts.COLUMNS, GuiLayouts.BANNER_BACK_SLOT / GuiLayouts.COLUMNS);
+            design = design.withBaseColor(nextBase(design.baseColor()));
+            refresh();
+        }, player), GuiLayouts.BANNER_BASE_SLOT % GuiLayouts.COLUMNS,
+                GuiLayouts.BANNER_BASE_SLOT / GuiLayouts.COLUMNS);
 
-        // Apply (stage)
-        chrome.addItem(wrap(GuiTheme.named(Material.LIME_DYE, GuiTheme.GREEN + "<bold>", "Apply",
-                GuiTheme.dim("Stage this design")), (p, e) -> {
+        // Add a layer.
+        chrome.addItem(wrap(GuiTheme.named(Material.SLIME_BALL, GuiTheme.GREEN + "<bold>", "Add layer",
+                GuiTheme.hint("Click", "choose pattern and dye")), (p, e) -> {
             SoundManager.playClick(p);
-            org.pvpcore.features.kits.cosmetics.CosmeticApplier applier =
-                    new org.pvpcore.features.kits.cosmetics.CosmeticApplier(
-                            CustomizeRules.parse(gui.kits().config().getConfigurationSection("customize")),
-                            new CosmeticValidator(CustomizeRules.parse(gui.kits().config().getConfigurationSection("customize"))));
-            ItemStack staged = applier.applyBanner(session.target(), design);
-            session.stageTarget(staged);
-            CustomizePage.reopen(gui, p, 0, session);
-        }, player), GuiLayouts.BANNER_APPLY_SLOT % GuiLayouts.COLUMNS, GuiLayouts.BANNER_APPLY_SLOT / GuiLayouts.COLUMNS);
+            BannerPatternPickerPage.open(gui, p, design, -1, session, kitSlot);
+        }, player), GuiLayouts.BANNER_ADD_SLOT % GuiLayouts.COLUMNS,
+                GuiLayouts.BANNER_ADD_SLOT / GuiLayouts.COLUMNS);
 
-        // Blank
+        // Remove the selected layer.
+        chrome.addItem(wrap(GuiTheme.named(Material.BARRIER, GuiTheme.MUTED + "<bold>", "Remove layer",
+                GuiTheme.dim("Selected layer"), GuiTheme.hint("Click", "remove")), (p, e) -> {
+            SoundManager.playClick(p);
+            if (selectedLayer < 0 || selectedLayer >= design.size()) return;
+            design = design.removeLayer(selectedLayer);
+            selectedLayer = -1;
+            refresh();
+        }, player), GuiLayouts.BANNER_REMOVE_SLOT % GuiLayouts.COLUMNS,
+                GuiLayouts.BANNER_REMOVE_SLOT / GuiLayouts.COLUMNS);
+
+        // Reorder the selected layer.
+        chrome.addItem(wrap(GuiTheme.named(Material.ARROW, GuiTheme.AQUA + "<bold>", "Move up",
+                GuiTheme.hint("Click", "earlier layer")), (p, e) -> {
+            SoundManager.playClick(p);
+            if (selectedLayer <= 0 || selectedLayer >= design.size()) return;
+            design = design.moveLayer(selectedLayer, selectedLayer - 1);
+            selectedLayer--;
+            refresh();
+        }, player), GuiLayouts.BANNER_UP_SLOT % GuiLayouts.COLUMNS,
+                GuiLayouts.BANNER_UP_SLOT / GuiLayouts.COLUMNS);
+        chrome.addItem(wrap(GuiTheme.named(Material.ARROW, GuiTheme.AQUA + "<bold>", "Move down",
+                GuiTheme.hint("Click", "later layer")), (p, e) -> {
+            SoundManager.playClick(p);
+            if (selectedLayer < 0 || selectedLayer >= design.size() - 1) return;
+            design = design.moveLayer(selectedLayer, selectedLayer + 1);
+            selectedLayer++;
+            refresh();
+        }, player), GuiLayouts.BANNER_DOWN_SLOT % GuiLayouts.COLUMNS,
+                GuiLayouts.BANNER_DOWN_SLOT / GuiLayouts.COLUMNS);
+
+        // Blank / Revert / Back.
         chrome.addItem(wrap(GuiTheme.named(Material.WHITE_BANNER, GuiTheme.MUTED + "<bold>", "Blank",
                 GuiTheme.dim("Clear all layers")), (p, e) -> {
             SoundManager.playClick(p);
             design = BannerDesign.blank();
+            selectedLayer = -1;
             refresh();
-        }, player), GuiLayouts.BANNER_BLANK_SLOT % GuiLayouts.COLUMNS, GuiLayouts.BANNER_BLANK_SLOT / GuiLayouts.COLUMNS);
-
-        // Revert
+        }, player), GuiLayouts.BANNER_BLANK_SLOT % GuiLayouts.COLUMNS,
+                GuiLayouts.BANNER_BLANK_SLOT / GuiLayouts.COLUMNS);
         chrome.addItem(wrap(GuiTheme.named(Material.BARRIER, GuiTheme.MUTED + "<bold>", "Revert",
                 GuiTheme.dim("Restore original")), (p, e) -> {
             SoundManager.playClick(p);
             design = original;
+            selectedLayer = -1;
             refresh();
-        }, player), GuiLayouts.BANNER_REVERT_SLOT % GuiLayouts.COLUMNS, GuiLayouts.BANNER_REVERT_SLOT / GuiLayouts.COLUMNS);
+        }, player), GuiLayouts.BANNER_REVERT_SLOT % GuiLayouts.COLUMNS,
+                GuiLayouts.BANNER_REVERT_SLOT / GuiLayouts.COLUMNS);
+        chrome.addItem(wrap(GuiTheme.back(), (p, e) -> {
+            SoundManager.playClick(p);
+            CustomizePage.reopen(gui, p, kitSlot, session);
+        }, player), GuiLayouts.BANNER_BACK_SLOT % GuiLayouts.COLUMNS,
+                GuiLayouts.BANNER_BACK_SLOT / GuiLayouts.COLUMNS);
+
+        // Apply (stage only, never save).
+        chrome.addItem(wrap(GuiTheme.named(Material.LIME_DYE, GuiTheme.GREEN + "<bold>", "Apply",
+                GuiTheme.dim("Stage this design")), (p, e) -> {
+            SoundManager.playClick(p);
+            CustomizeRules rules = rulesOf(gui);
+            if (!rules.enabled()) {
+                gui.kits().lang().send(p, "error.cosmetics-disabled");
+                return;
+            }
+            CosmeticValidator validator = new CosmeticValidator(rules);
+            ItemStack target = session.target();
+            if (!validator.isShield(target) || validator.hasUnreadableBannerLayers(target)) {
+                gui.kits().lang().send(p, "error.cosmetics-banner-locked");
+                return;
+            }
+            try {
+                session.stageTarget(new CosmeticApplier(rules, validator).applyBanner(target, design));
+            } catch (IllegalArgumentException ex) {
+                // Unknown/unavailable pattern: fail closed, leaving the staged shield untouched.
+                gui.kits().lang().send(p, "error.cosmetics-banner-locked");
+                return;
+            }
+            CustomizePage.reopen(gui, p, kitSlot, session);
+        }, player), GuiLayouts.BANNER_APPLY_SLOT % GuiLayouts.COLUMNS,
+                GuiLayouts.BANNER_APPLY_SLOT / GuiLayouts.COLUMNS);
+    }
+
+    private static DyeColor nextBase(DyeColor current) {
+        DyeColor[] colors = DyeColor.values();
+        if (current == null) return colors.length == 0 ? null : colors[0];
+        for (int i = 0; i < colors.length; i++) {
+            if (colors[i] == current) {
+                return i + 1 < colors.length ? colors[i + 1] : null;
+            }
+        }
+        return null;
+    }
+
+    private static ItemStack bannerIcon(DyeColor dye, String... lore) {
+        Material material = Material.matchMaterial(dye.name().toLowerCase(Locale.ROOT) + "_banner");
+        return GuiTheme.named(material == null ? Material.WHITE_BANNER : material,
+                GuiTheme.TEXT + "<bold>", dye.name(), lore);
     }
 
     @Override
@@ -118,10 +240,21 @@ public final class BannerDesignerPage extends GuiScreen {
         chest.setOnTopClick(event -> {
             if (event.getRawSlot() != GuiLayouts.BANNER_TEMPLATE_SLOT) return;
             event.setCancelled(true);
-            org.bukkit.inventory.ItemStack cursor = event.getCursor();
+            ItemStack cursor = event.getCursor();
             if (cursor == null || cursor.getType().isAir()) return;
             if (!(cursor.getItemMeta() instanceof org.bukkit.inventory.meta.BannerMeta)) return;
-            try { design = BannerDesign.from(cursor); refresh(); } catch (RuntimeException ignored) { }
+            try {
+                design = BannerDesign.from(cursor);
+                selectedLayer = -1;
+                refresh();
+            } catch (RuntimeException ignored) {
+                // A non-banner or unreadable template must not change the design.
+            }
+        });
+        chest.setOnClose(event -> {
+            if (event.getPlayer() instanceof Player closer) {
+                gui.unregisterCustomizeScreen(closer.getUniqueId());
+            }
         });
     }
 }

@@ -34,6 +34,7 @@ public final class RenameTargetPage extends GuiScreen {
         this.gui = gui;
         this.session = session;
         this.kitSlot = kitSlot;
+        gui.registerCustomizeScreen(player.getUniqueId());
     }
 
     public static void open(GUI gui, Player player, CustomizeSession session, int kitSlot) {
@@ -108,5 +109,10 @@ public final class RenameTargetPage extends GuiScreen {
 
     @Override
     protected void configure(com.github.stefvanschie.inventoryframework.gui.type.ChestGui chest) {
+        chest.setOnClose(event -> {
+            if (event.getPlayer() instanceof Player closer) {
+                gui.unregisterCustomizeScreen(closer.getUniqueId());
+            }
+        });
     }
 }

@@ -196,6 +196,7 @@ class CustomizeServiceTest {
     void forgetMainMenuPageClearsPendingAndStaleState() {
         UUID viewer = player.getUniqueId();
         UUID operationId = gui.setPendingCustomize(viewer, session);
+        gui.registerCustomizeScreen(viewer);
         gui.invalidateCustomizeSessions();
         assertTrue(gui.isCustomizeStale(viewer));
 
@@ -203,5 +204,75 @@ class CustomizeServiceTest {
 
         assertFalse(gui.isCustomizeStale(viewer));
         assertNull(gui.takePendingCustomize(viewer, operationId));
+        gui.invalidateCustomizeSessions();
+        assertFalse(gui.isCustomizeStale(viewer)); // no screen or pending left to invalidate
+    }
+
+    @Test
+    void openScreenViewersAreInvalidatedOnReload() {
+        UUID viewer = player.getUniqueId();
+        gui.registerCustomizeScreen(viewer);
+
+        gui.invalidateCustomizeSessions();
+
+        assertTrue(gui.isCustomizeStale(viewer));
+        stale = p -> gui.isCustomizeStale(p.getUniqueId());
+        assertEquals(ApplyResult.KIT_CHANGED, service().commit(player, 1, session));
+        assertEquals(0, saves.get());
+    }
+
+    @Test
+    void unregisteringAllScreensStopsReloadInvalidation() {
+        UUID viewer = player.getUniqueId();
+        gui.registerCustomizeScreen(viewer); // customize screen
+        gui.registerCustomizeScreen(viewer); // rename screen
+        gui.unregisterCustomizeScreen(viewer);
+        gui.unregisterCustomizeScreen(viewer);
+
+        gui.invalidateCustomizeSessions();
+
+        assertFalse(gui.isCustomizeStale(viewer));
+    }
+
+    @Test
+    void holdPendingCustomizeDoesNotClearReloadStaleMarker() {
+        UUID viewer = player.getUniqueId();
+        gui.markCustomizeStale(viewer);
+
+        UUID operationId = gui.holdPendingCustomize(viewer, session);
+
+        assertTrue(gui.isCustomizeStale(viewer));
+        assertNull(gui.takePendingCustomize(viewer, operationId));
+    }
+
+    @Test
+    void outcomeReceivesSuccessOnlyAfterQueuedWriteCompletes() {
+        AtomicReference<Boolean> outcome = new AtomicReference<>();
+
+        assertEquals(ApplyResult.QUEUED, service().commit(player, 1, session, outcome::set));
+        assertNull(outcome.get());
+        assertFalse(pendingWrite.isDone());
+
+        pendingWrite.complete(null);
+        assertEquals(Boolean.TRUE, outcome.get());
+    }
+
+    @Test
+    void outcomeReceivesFailureWithoutPropagatingTheStorageError() {
+        AtomicReference<Boolean> outcome = new AtomicReference<>();
+
+        assertEquals(ApplyResult.QUEUED, service().commit(player, 1, session, outcome::set));
+        assertDoesNotThrow(() -> pendingWrite.completeExceptionally(new IllegalStateException("disk failed")));
+
+        assertEquals(Boolean.FALSE, outcome.get());
+        assertEquals(1, saves.get());
+    }
+
+    @Test
+    void throwingOutcomeCallbackIsLoggedWithoutBreakingCompletion() {
+        assertEquals(ApplyResult.QUEUED, service().commit(player, 1, session, success -> {
+            throw new IllegalStateException("callback failed");
+        }));
+        assertDoesNotThrow(() -> pendingWrite.complete(null));
     }
 }
