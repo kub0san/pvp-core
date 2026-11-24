@@ -108,7 +108,10 @@ public final class ConsistentDurabilityMechanic implements Mechanic, Listener {
         return active ? "average Unbreaking applied to armour, shields, and elytra" : null;
     }
 
-    @EventHandler(priority = EventPriority.NORMAL)
+    // MONITOR + ignoreCancelled: the fractional counter must only be written once every other
+    // plugin has decided whether the damage actually happens. Writing it at NORMAL leaves the
+    // item inconsistent when a later handler cancels the event (see onItemMend below).
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
     public void onPlayerItemDamage(PlayerItemDamageEvent event) {
         if (!active) {
             return;
