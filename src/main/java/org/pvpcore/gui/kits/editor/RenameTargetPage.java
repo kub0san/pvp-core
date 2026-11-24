@@ -5,7 +5,12 @@ import com.github.stefvanschie.inventoryframework.pane.StaticPane;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
+import java.util.UUID;
+import org.pvpcore.config.kits.CustomizeRules;
+import org.pvpcore.features.kits.cosmetics.CosmeticApplier;
+import org.pvpcore.features.kits.cosmetics.CosmeticValidator;
 import org.pvpcore.features.kits.cosmetics.CustomizeSession;
+import org.pvpcore.gui.base.GuiChatPrompt;
 import org.pvpcore.gui.base.GuiGuard;
 import org.pvpcore.gui.base.GuiLayouts;
 import org.pvpcore.gui.base.GuiScreen;
@@ -54,17 +59,44 @@ public final class RenameTargetPage extends GuiScreen {
             CustomizePage.reopen(gui, p, kitSlot, session);
         }, player), GuiLayouts.RENAME_BACK_SLOT % GuiLayouts.COLUMNS, GuiLayouts.RENAME_BACK_SLOT / GuiLayouts.COLUMNS);
 
-        // Ghost slots 0..40 are display-only placeholders; full ghost rendering is server-side.
+        // Ghost slots 0..40
         for (int i = GuiLayouts.RENAME_TARGET_FIRST; i <= GuiLayouts.RENAME_TARGET_LAST; i++) {
             final int targetSlot = i;
-            chrome.addItem(wrap(GuiTheme.named(Material.GRAY_DYE, GuiTheme.MUTED + "<bold>", "Slot " + i,
-                    GuiTheme.hint("Click", "rename")), (p, e) -> {
+            ItemStack item = session.working()[targetSlot];
+            boolean empty = item == null || item.getType().isAir();
+            Material icon = empty ? Material.GRAY_DYE : item.getType();
+            String name = empty ? "Empty" : (item.hasItemMeta() && item.getItemMeta().hasDisplayName()
+                    ? item.getItemMeta().displayName() != null ? net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer.plainText().serialize(item.getItemMeta().displayName()) : "Item"
+                    : item.getType().name());
+            chrome.addItem(wrap(GuiTheme.named(icon, empty ? GuiTheme.MUTED : GuiTheme.TEXT + "<bold>", name,
+                    empty ? GuiTheme.dim("No item") : GuiTheme.hint("Click", "rename")), (p, e) -> {
+                if (empty) return;
                 SoundManager.playClick(p);
-                ItemStack item = session.working()[targetSlot];
-                if (item == null || item.getType().isAir()) return;
                 session.selectTarget(targetSlot);
-                // Chat prompt integration is server-side; placeholder only.
-                gui.kits().lang().send(p, "info.cosmetics-save-queued");
+                UUID opId = gui.setPendingCustomize(p.getUniqueId(), session);
+                CustomizeRules rules = CustomizeRules.parse(gui.kits().config().getConfigurationSection("customize"));
+                CosmeticValidator validator = new CosmeticValidator(rules);
+                CosmeticApplier applier = new CosmeticApplier(rules, validator);
+                GuiChatPrompt.ask(gui.plugin(), p, "Type a new name (MiniMessage), or 'cancel'",
+                        text -> {
+                            CustomizeSession taken = gui.takePendingCustomize(p.getUniqueId(), opId);
+                            if (taken == null) return;
+                            try {
+                                net.kyori.adventure.text.Component parsed = validator.parseName(text);
+                                ItemStack current = taken.target();
+                                if (current != null) {
+                                    ItemStack staged = applier.applyName(current, text);
+                                    taken.stageTarget(staged);
+                                }
+                            } catch (IllegalArgumentException ex) {
+                                gui.kits().lang().send(p, "error.cosmetics-name-invalid");
+                            }
+                            CustomizePage.reopen(gui, p, kitSlot, taken);
+                        },
+                        () -> {
+                            gui.takePendingCustomize(p.getUniqueId(), opId);
+                            CustomizePage.reopen(gui, p, kitSlot, session);
+                        });
             }, player), i % GuiLayouts.COLUMNS, i / GuiLayouts.COLUMNS);
         }
     }
