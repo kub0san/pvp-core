@@ -39,7 +39,7 @@ final class TotemPacketListener extends PacketListenerAbstract {
                 // one InventoryDragEvent. Track only the final stage so the packet and
                 // Bukkit event counters remain paired.
                 if (packet.getWindowClickType() != WrapperPlayClientClickWindow.WindowClickType.QUICK_CRAFT
-                        || (packet.getButton() >> 2) == 2) {
+                        || QuickCraftButtons.isEnd(packet.getButton())) {
                     tracker.packetReceived(playerId, TotemSwapTracker.Action.INVENTORY_CLICK);
                 }
             } catch (RuntimeException malformedPacket) {
