@@ -17,8 +17,14 @@ Optional dependencies fail closed: if PacketEvents, WorldGuard, Multiverse-Core 
 ## Requirements
 
 - **Java 21+** at runtime (built with JDK 25, emits Java 21 bytecode)
-- **Paper 1.21.11 – 26.3** (target server: Paper 26.3)
+- **Paper 1.21.11 – 26.3** (target server: Leaf 26.3-27, Paper API 26.3.build.27-alpha; Java 21 bytecode, Java 25 build toolchain)
 - Optional: PacketEvents 2.14.0+, WorldGuard, Multiverse-Core, KnockbackSync
+
+## Testing
+
+- Shared test server: `C:\Tools\global-test-server-26.3` (Leaf 26.3-27, Java 25, game port 25566). Canonical guide: `C:\Projects\GLOBAL_TEST_SERVER.md`.
+- From that folder: `.\TestServer.ps1 setup`, `deploy pvp-core`, `restart`, `verify`, `snapshot`, `reset`, `stop`. `.\TestServer.ps1 -Help` prints the full command table and MCP map.
+- Player data is scrubbed except qcart (`befc5d95-fd63-4cae-b0f5-7c2fb271c699`). Craftwire is the primary E2E tool; a green handshake is not a pass.
 
 ## Building
 
