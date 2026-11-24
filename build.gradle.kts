@@ -38,6 +38,9 @@ dependencies {
     implementation("com.github.stefvanschie.inventoryframework:IF:0.12.2")
     implementation("redis.clients:jedis:5.1.0")
     implementation("com.zaxxer:HikariCP:5.1.0")
+    // SQLite JDBC driver: HikariCP configures org.sqlite.JDBC explicitly, but nothing on the
+    // runtime/shaded classpath provided it, so every kits storage connection failed at enable.
+    implementation("org.xerial:sqlite-jdbc:3.54.1.0")
     implementation("net.kyori:adventure-platform-bukkit:4.3.2")
     compileOnly("com.sk89q.worldguard:worldguard-bukkit:7.0.9")
     compileOnly("com.sk89q.worldedit:worldedit-bukkit:7.2.15")
@@ -51,6 +54,9 @@ dependencies {
 
     // Unit tests: MockBukkit v1.21 targets Paper 1.21.11 and emits Java 21 bytecode,
     // matching this plugin's runtime target. Packet/GUI behaviour still needs a real server.
+    // MockBukkit does not bring the Bukkit API itself, so the test source set needs it
+    // explicitly (compileOnly above is not inherited by test compilation).
+    testImplementation("io.papermc.paper:paper-api:1.21.11-R0.1-SNAPSHOT")
     testImplementation("org.mockbukkit.mockbukkit:mockbukkit-v1.21:4.116.3")
     testImplementation(platform("org.junit:junit-bom:5.10.2"))
     testImplementation("org.junit.jupiter:junit-jupiter:5.10.2")
