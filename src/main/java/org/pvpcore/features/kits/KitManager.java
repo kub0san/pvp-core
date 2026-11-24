@@ -37,7 +37,10 @@ import org.bukkit.potion.PotionEffect;
 
 import java.io.IOException;
 import java.util.*;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.BiConsumer;
+import org.bukkit.plugin.Plugin;
 import org.pvpcore.storage.StorageWorkQueue;
 
 public class KitManager {
@@ -61,6 +64,28 @@ public class KitManager {
 
     public KitsContext context() {
         return context;
+    }
+
+    /**
+     * Delivers save feedback only once the storage write has resolved. The storage worker is
+     * off the main thread, so the callback is marshalled back before touching Bukkit state,
+     * and the player is re-resolved in case they left while the write was queued.
+     */
+    static void reportWhenWritten(Plugin plugin, UUID playerId, CompletableFuture<Void> write,
+                                  BiConsumer<Player, Boolean> reporter) {
+        write.whenComplete((unused, error) -> {
+            if (!plugin.isEnabled()) return; // shutdown: never schedule onto a disabled plugin
+            try {
+                plugin.getServer().getScheduler().runTask(plugin, () -> {
+                    Player player = Bukkit.getPlayer(playerId);
+                    if (player != null) {
+                        reporter.accept(player, error == null);
+                    }
+                });
+            } catch (org.bukkit.plugin.IllegalPluginAccessException disabled) {
+                // The plugin disabled between the check and scheduling; feedback is moot.
+            }
+        });
     }
 
     private org.bukkit.configuration.file.FileConfiguration config() {
@@ -134,6 +159,11 @@ public class KitManager {
 
     public StorageWorkQueue storageWork() { return store.storageWork(); }
 
+    /** Replays failed-write recovery files before any cache load is queued. */
+    void replayFailedWrites() {
+        store.replayRecoveryFiles();
+    }
+
     public boolean savekit(UUID uuid, int slot, ItemStack[] kit) {
         return savePersonalKit(uuid, slot, kit, false, false);
     }
@@ -171,8 +201,22 @@ public class KitManager {
         }
         String id = enderchest ? IDUtil.getECId(uuid, slot) : IDUtil.getPlayerKitId(uuid, slot);
         cacheKit(id, prepared);
-        store.saveKitToDB(id);
-        if (player != null) lang().send(player, enderchest ? "success.ec-saved" : "success.kit-saved", "slot", String.valueOf(slot));
+        if (silent) {
+            // Editor autosaves, kit swaps and share deliveries must not spam chat.
+            store.saveKitToDB(id);
+            return true;
+        }
+        UUID playerId = uuid;
+        boolean enderchestSlot = enderchest;
+        int savedSlot = slot;
+        reportWhenWritten(context.plugin(), playerId, store.saveKitToDB(id), (recipient, ok) -> {
+            if (ok) {
+                lang().send(recipient, enderchestSlot ? "success.ec-saved" : "success.kit-saved",
+                        "slot", String.valueOf(savedSlot));
+            } else {
+                lang().send(recipient, "error.public-kit-save-failed", "kitid", id);
+            }
+        });
         return true;
     }
 
@@ -182,8 +226,14 @@ public class KitManager {
             lang().send(player, "error.empty-kit");
             return false;
         }
-        store.savePublicKitToDB(id);
-        lang().send(player, "success.public-kit-saved", "kitname", id);
+        String savedId = id;
+        reportWhenWritten(context.plugin(), player.getUniqueId(), store.savePublicKitToDB(id), (recipient, ok) -> {
+            if (ok) {
+                lang().send(recipient, "success.public-kit-saved", "kitname", savedId);
+            } else {
+                lang().send(recipient, "error.public-kit-save-failed", "kitid", savedId);
+            }
+        });
         return true;
     }
 

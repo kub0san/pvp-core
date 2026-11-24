@@ -11,9 +11,15 @@ import org.bukkit.inventory.ItemStack;
 
 import java.io.IOException;
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.logging.Logger;
 
 /**
@@ -28,6 +34,9 @@ final class KitRecordStore {
     private final StorageWorkQueue storageWork;
     private final Logger logger;
     private final Map<String, String> failedWrites = new ConcurrentHashMap<>();
+    private final StorageGenerations generations = new StorageGenerations();
+    /** Recovery files still on disk and the kit ids they may contain (see replayRecoveryFiles). */
+    private final Map<Path, ConcurrentHashMap<String, String>> recoveryEntries = new ConcurrentHashMap<>();
 
     KitRecordStore(KitsContext context, KitCache cache) {
         this.context = java.util.Objects.requireNonNull(context, "context");
@@ -80,11 +89,23 @@ final class KitRecordStore {
         else storageManager().saveKitDataByID(key, data);
     }
 
-    void queueWrite(String key, String data) {
-        storageWork.run(() -> {
+    long generation(String id) {
+        return generations.get(id);
+    }
+
+    boolean isCurrent(String id, long captured) {
+        return generations.isCurrent(id, captured);
+    }
+
+    CompletableFuture<Void> queueWrite(String key, String data) {
+        // Bump at enqueue time: a read already in flight must be considered stale as soon as
+        // a newer write is submitted, not only after it commits.
+        generations.bump(key);
+        return storageWork.run(() -> {
             try {
                 writeStoredData(key, data);
                 failedWrites.remove(key);
+                invalidateRecoveryEntry(key);
             } catch (RuntimeException e) {
                 failedWrites.put(key, data);
                 throw e;
@@ -92,19 +113,80 @@ final class KitRecordStore {
         });
     }
 
-    void retryFailedWrites() {
-        failedWrites.forEach((key, data) -> storageWork.run(() -> {
+    /**
+     * A newer successful write makes any older failed-write record for the same id obsolete.
+     * Otherwise a previously failed replay could overwrite this value after another restart.
+     */
+    private void invalidateRecoveryEntry(String id) {
+        for (Map.Entry<Path, ConcurrentHashMap<String, String>> file : recoveryEntries.entrySet()) {
+            if (file.getValue().remove(id) == null) continue;
+            if (file.getValue().isEmpty()) {
+                recoveryEntries.remove(file.getKey());
+                try {
+                    FailedWriteRecovery.markApplied(file.getKey());
+                } catch (IOException e) {
+                    logger.warning("Cannot retire superseded recovery file " + file.getKey().getFileName()
+                            + ": " + e.getMessage());
+                }
+            } else {
+                FailedWriteRecovery.rewrite(file.getKey(), file.getValue());
+            }
+        }
+    }
+
+    CompletableFuture<Void> retryFailedWrites() {
+        List<CompletableFuture<Void>> writes = new ArrayList<>();
+        failedWrites.forEach((key, data) -> writes.add(storageWork.run(() -> {
             if (!data.equals(failedWrites.get(key))) return;
             writeStoredData(key, data);
             failedWrites.remove(key, data);
-        }));
+        })));
+        return CompletableFuture.allOf(writes.toArray(CompletableFuture[]::new));
     }
 
-    void saveKitToDB(String key) {
+    /**
+     * Restores writes that were recorded as failed on a previous shutdown. Called on enable
+     * before cache loading; waits for the recovered writes to commit so the subsequent reads
+     * cannot cache stale pre-recovery data.
+     */
+    void replayRecoveryFiles() {
+        Path folder = context.plugin().getDataFolder().toPath();
+        for (Path file : FailedWriteRecovery.files(folder)) {
+            try {
+                ConcurrentHashMap<String, String> entries = new ConcurrentHashMap<>();
+                for (FailedWriteRecovery.Entry entry : FailedWriteRecovery.readFile(file)) {
+                    if (entry.data() != null) {
+                        entries.put(entry.id(), entry.data());
+                        failedWrites.putIfAbsent(entry.id(), entry.data());
+                    }
+                }
+                if (entries.isEmpty()) continue;
+                recoveryEntries.put(file, entries);
+                try {
+                    retryFailedWrites().get(30, TimeUnit.SECONDS);
+                    FailedWriteRecovery.markApplied(file);
+                    recoveryEntries.remove(file);
+                } catch (TimeoutException e) {
+                    logger.warning("Timed out replaying " + file.getFileName() + "; keeping it for retry");
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    logger.warning("Interrupted while replaying " + file.getFileName() + "; keeping it for retry");
+                } catch (ExecutionException e) {
+                    logger.warning("Failed to replay " + file.getFileName() + "; keeping it for retry: " + e.getMessage());
+                } catch (IOException e) {
+                    logger.warning("Cannot retire recovery file " + file.getFileName() + ": " + e.getMessage());
+                }
+            } catch (RuntimeException e) {
+                logger.warning("Cannot read recovery file " + file.getFileName() + ": " + e.getMessage());
+            }
+        }
+    }
+
+    CompletableFuture<Void> saveKitToDB(String key) {
         ItemStack[] snapshot = KitContents.copy(cache.getRaw(key));
-        if (snapshot == null) return;
+        if (snapshot == null) return CompletableFuture.completedFuture(null);
         String data = Serializer.itemStackArrayToBase64(snapshot);
-        queueWrite(key, data);
+        return queueWrite(key, data);
     }
 
     void savePlayerKitToDB(UUID uuid, int slot) {
@@ -115,8 +197,8 @@ final class KitRecordStore {
         saveKitToDB(IDUtil.getECId(uuid, slot));
     }
 
-    void savePublicKitToDB(String id) {
-        saveKitToDB(IDUtil.getPublicKitId(id));
+    CompletableFuture<Void> savePublicKitToDB(String id) {
+        return saveKitToDB(IDUtil.getPublicKitId(id));
     }
 
     void savePlayerKitsToDB(UUID uuid, int max) {
@@ -127,7 +209,9 @@ final class KitRecordStore {
     }
 
     void loadKitEntryFromDB(String id, int size) {
+        long captured = generation(id);
         String data = storageManager().getKitDataByID(id);
+        if (!isCurrent(id, captured)) return; // a newer write won; discard this snapshot
         if (!isStoredData(data)) return;
         try {
             ItemStack[] decoded = decodeKit(data, size);
@@ -186,7 +270,8 @@ final class KitRecordStore {
         storageWork.close();
         if (!failedWrites.isEmpty()) {
             YamlConfiguration recovery = new YamlConfiguration();
-            recovery.set("storage-type", config == null ? null : config.getString("storage.type"));
+            // SQLite is the only backend; the old config key never existed and wrote null.
+            recovery.set("storage-type", "sqlite");
             failedWrites.forEach((id, data) -> recovery.set((DELETED.equals(data) ? "delete." : "kits.") + id, DELETED.equals(data) ? true : data));
             try {
                 Path file = context.plugin().getDataFolder().toPath().resolve("failed-kit-writes-" + System.currentTimeMillis() + ".yml");

@@ -32,7 +32,9 @@ final class PlayerKitSession {
     private final Map<UUID, Object> sessions = new ConcurrentHashMap<>();
     private final Set<UUID> loading = ConcurrentHashMap.newKeySet();
 
-    private record LoadedPlayerData(Map<String, String> kits, String inventorySelection, String enderchestSelection) {}
+    private record LoadedPlayerData(Map<String, String> kits, Map<String, Long> generations,
+                                    String inventorySelection, String enderchestSelection,
+                                    long inventorySelectionGeneration, long enderchestSelectionGeneration) {}
 
     PlayerKitSession(KitsContext context, KitCache cache, KitRecordStore store,
                      IntSupplier maxConfiguredSlots, BiFunction<Player, Integer, Boolean> loadEnderchestSilent) {
@@ -87,12 +89,24 @@ final class PlayerKitSession {
         final int max = maxConfiguredSlots.getAsInt();
         store.storageWork().supply(() -> {
             Map<String, String> data = new LinkedHashMap<>();
+            Map<String, Long> generations = new LinkedHashMap<>();
             for (int slot = 1; slot <= max; slot++) {
                 for (String id : List.of(IDUtil.getPlayerKitId(uuid, slot), IDUtil.getECId(uuid, slot))) {
+                    // Capture BEFORE reading: a write between read and capture would make
+                    // stale data look current.
+                    long generation = store.generation(id);
                     data.put(id, store.readStoredData(id));
+                    generations.put(id, generation);
                 }
             }
-            return new LoadedPlayerData(data, store.readStoredData(KitSelection.kitKey(uuid)), store.readStoredData(KitSelection.enderchestKey(uuid)));
+            String inventoryKey = KitSelection.kitKey(uuid);
+            long inventorySelectionGeneration = store.generation(inventoryKey);
+            String inventorySelection = store.readStoredData(inventoryKey);
+            String enderchestKey = KitSelection.enderchestKey(uuid);
+            long enderchestSelectionGeneration = store.generation(enderchestKey);
+            String enderchestSelection = store.readStoredData(enderchestKey);
+            return new LoadedPlayerData(data, generations, inventorySelection, enderchestSelection,
+                    inventorySelectionGeneration, enderchestSelectionGeneration);
         }).whenComplete((data, error) -> {
             if (!context.plugin().isEnabled()) {
                 loading.remove(uuid);
@@ -108,6 +122,11 @@ final class PlayerKitSession {
                 }
                 Map<String, ItemStack[]> parsed = new LinkedHashMap<>();
                 for (Map.Entry<String, String> entry : data.kits().entrySet()) {
+                    // A write submitted after this snapshot was taken wins: never let a stale
+                    // read overwrite the newer cached kit.
+                    if (!store.isCurrent(entry.getKey(), data.generations().getOrDefault(entry.getKey(), -1L))) {
+                        continue;
+                    }
                     String encoded = entry.getValue();
                     if (!KitRecordStore.isStoredData(encoded)) continue;
                     int size = entry.getKey().startsWith(uuid + "ec") ? KitContents.ENDERCHEST_SIZE : KitContents.INVENTORY_SIZE;
@@ -124,7 +143,10 @@ final class PlayerKitSession {
                     }
                 }
                 parsed.forEach(cache::cacheKit); // Force update cache
-                restoreSelections(uuid, data.inventorySelection(), data.enderchestSelection());
+                if (store.isCurrent(KitSelection.kitKey(uuid), data.inventorySelectionGeneration())
+                        && store.isCurrent(KitSelection.enderchestKey(uuid), data.enderchestSelectionGeneration())) {
+                    restoreSelections(uuid, data.inventorySelection(), data.enderchestSelection());
+                }
                 loading.remove(uuid);
             });
         });
