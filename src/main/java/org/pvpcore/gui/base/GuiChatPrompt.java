@@ -7,6 +7,7 @@ import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
+import org.bukkit.event.HandlerList;
 import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.plugin.Plugin;
@@ -36,6 +37,7 @@ public final class GuiChatPrompt implements Listener {
     private static final Map<UUID, Pending> PENDING = new ConcurrentHashMap<>();
     private static Plugin plugin;
     private static boolean registered;
+    private static Listener listener;
 
     private record Pending(Consumer<String> onInput, Runnable onCancel, BukkitTask timeout) {
     }
@@ -51,7 +53,8 @@ public final class GuiChatPrompt implements Listener {
     public static void ask(Plugin plugin, Player player, String instruction, Consumer<String> onInput, Runnable onCancel) {
         GuiChatPrompt.plugin = plugin;
         if (!registered) {
-            Bukkit.getPluginManager().registerEvents(new GuiChatPrompt(), plugin);
+            listener = new GuiChatPrompt();
+            Bukkit.getPluginManager().registerEvents(listener, plugin);
             registered = true;
         }
         UUID id = player.getUniqueId();
@@ -88,22 +91,31 @@ public final class GuiChatPrompt implements Listener {
         }
     }
 
-    /** Drops every waiting prompt. Called when the plugin shuts down. */
+    /** Drops every waiting prompt and forgets the registration so a reload can re-register. */
     public static void clear() {
         PENDING.values().forEach(p -> p.timeout().cancel());
         PENDING.clear();
+        if (listener != null) {
+            HandlerList.unregisterAll(listener);
+            listener = null;
+        }
+        registered = false;
+        plugin = null;
     }
 
     @EventHandler(priority = EventPriority.LOWEST)
     public void onChat(AsyncChatEvent event) {
+        // Snapshot the owner: clear() runs on the main thread and nulls the static field while
+        // this handler is on the async chat thread.
+        Plugin owner = plugin;
         Pending pending = PENDING.remove(event.getPlayer().getUniqueId());
-        if (pending == null) {
+        if (pending == null || owner == null) {
             return;
         }
         event.setCancelled(true);
         pending.timeout().cancel();
         String text = PlainTextComponentSerializer.plainText().serialize(event.message()).trim();
-        Bukkit.getScheduler().runTask(plugin, () -> {
+        Bukkit.getScheduler().runTask(owner, () -> {
             if (text.equalsIgnoreCase("cancel")) {
                 pending.onCancel().run();
             } else {
