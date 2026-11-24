@@ -44,6 +44,22 @@ class CosmeticValidatorTest {
     }
 
     @Test
+    void blockedTagsAreDistinguishableFromOtherInvalidNames() {
+        CosmeticValidator validator = new CosmeticValidator(CustomizeRules.parse(null));
+        assertThrows(CosmeticValidator.BlockedTagException.class,
+                () -> validator.parseName("<click:run_command:/spawn>bad</click>"));
+        assertThrows(CosmeticValidator.BlockedTagException.class,
+                () -> validator.parseName("<keybind:key.jump>bad</keybind>"));
+
+        MemoryConfiguration shortName = new MemoryConfiguration();
+        shortName.set("max-name-length", 2);
+        CosmeticValidator strict = new CosmeticValidator(CustomizeRules.parse(shortName));
+        IllegalArgumentException tooLong = assertThrows(IllegalArgumentException.class,
+                () -> strict.parseName("toolong"));
+        assertFalse(tooLong instanceof CosmeticValidator.BlockedTagException);
+    }
+
+    @Test
     void unreadableLayerIsCounted() {
         CosmeticValidator validator = new CosmeticValidator(CustomizeRules.parse(null));
         assertEquals(2, validator.unreadableLayerCount(5, 3));

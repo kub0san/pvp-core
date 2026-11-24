@@ -12,4 +12,19 @@ class GuiCosmeticLayoutTest {
         assertNotEquals(GuiLayouts.CUSTOMIZE_PREVIEW_SLOT, GuiLayouts.CUSTOMIZE_APPLY_SLOT);
         assertNotEquals(GuiLayouts.CUSTOMIZE_REMOVE_SLOT, GuiLayouts.CUSTOMIZE_APPLY_SLOT);
     }
+
+    @Test
+    void customizeFamilyTitlesAreConvertedBeforeGuiScreenDeserializesThem() {
+        // GuiScreen.titleComponent() reads a legacy string, so a raw MiniMessage title shows
+        // literal tags in-game. sectionTitle uses this conversion; pin that it strips them.
+        String title = org.pvpcore.util.TextUtil.toLegacy(
+                GuiTheme.ACCENT + "<bold>Customize Kit 1");
+        assertFalse(title.contains("<"), title);
+        net.kyori.adventure.text.Component component =
+                net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer.legacySection()
+                        .deserialize(title);
+        assertEquals("Customize Kit 1",
+                net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer.plainText()
+                        .serialize(component));
+    }
 }

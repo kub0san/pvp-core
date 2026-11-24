@@ -7,13 +7,10 @@ import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
-import org.bukkit.inventory.meta.ArmorMeta;
-import org.bukkit.inventory.meta.trim.ArmorTrim;
 import org.bukkit.inventory.meta.trim.TrimMaterial;
 import org.bukkit.inventory.meta.trim.TrimPattern;
 import io.papermc.paper.registry.RegistryAccess;
 import io.papermc.paper.registry.RegistryKey;
-import org.bukkit.Registry;
 import org.pvpcore.commands.kits.core.ActionGuards;
 import org.pvpcore.config.kits.CustomizeRules;
 import org.pvpcore.features.kits.cosmetics.ApplyResult;
@@ -25,6 +22,7 @@ import org.pvpcore.features.kits.cosmetics.CustomizeService;
 import org.pvpcore.features.kits.cosmetics.CustomizeSession;
 import org.pvpcore.gui.base.GuiGuard;
 import org.pvpcore.gui.base.GuiLayouts;
+import org.pvpcore.gui.base.GuiMenuFactory;
 import org.pvpcore.gui.base.GuiPager;
 import org.pvpcore.gui.base.GuiScreen;
 import org.pvpcore.gui.base.GuiTheme;
@@ -49,6 +47,7 @@ public final class CustomizePage extends GuiScreen {
     private String selectedTrimPattern;
     private String selectedTrimMaterial;
     private boolean trimMaterialStep;
+    private int page;
     private Mode mode = Mode.TRIM;
     private boolean writePending;
 
@@ -91,26 +90,55 @@ public final class CustomizePage extends GuiScreen {
 
     @Override
     protected String title() {
-        return GuiTheme.ACCENT + "<bold>Customize Kit " + kitSlot;
+        if (kits() == null) return "Customize Kit " + kitSlot;
+        // GuiScreen expects a legacy title; sectionTitle converts MiniMessage so the brand
+        // colour and bold actually render instead of showing literal tags in-game.
+        return GuiMenuFactory.sectionTitle(kits(), GuiTheme.ACCENT + "<bold>Customize Kit " + kitSlot);
     }
+
+    private CustomizeRules rules() {
+        return CustomizeRules.parse(gui.kits().config().getConfigurationSection("customize"));
+    }
+
+    /** Resolves both selected registry keys; null means a key is unknown or unavailable. */
+    private static TrimChoice resolveTrimChoice(String patternKey, String materialKey) {
+        if (patternKey == null || materialKey == null) return null;
+        try {
+            RegistryAccess access = RegistryAccess.registryAccess();
+            if (access == null) return null;
+            NamespacedKey patternId = NamespacedKey.fromString(patternKey);
+            NamespacedKey materialId = NamespacedKey.fromString(materialKey);
+            if (patternId == null || materialId == null) return null;
+            TrimPattern pattern = access.getRegistry(RegistryKey.TRIM_PATTERN).get(patternId);
+            TrimMaterial material = access.getRegistry(RegistryKey.TRIM_MATERIAL).get(materialId);
+            return pattern == null || material == null ? null : new TrimChoice(material, pattern);
+        } catch (RuntimeException e) {
+            return null;
+        }
+    }
+
+    private static CosmeticApplier applier(CustomizeRules rules, CosmeticValidator validator) {
+        return new CosmeticApplier(rules, validator);
+    }
+
+    private record TrimChoice(TrimMaterial material, TrimPattern pattern) {}
 
     @Override
     protected void renderContent(StaticPane content) {
         if (mode != Mode.TRIM) return;
         // Trim picker: pattern step or material step, paged.
-        CustomizeRules rules = CustomizeRules.parse(gui.kits().config().getConfigurationSection("customize"));
-        CosmeticCatalog catalog = CosmeticCatalog.fromRegistries(rules);
+        CosmeticCatalog catalog = CosmeticCatalog.fromRegistries(rules());
         List<CosmeticCatalog.Entry> entries = trimMaterialStep
                 ? catalog.trimMaterials() : catalog.trimPatterns();
-        GuiPager pager = GuiPager.of(0, entries.size(), GuiLayouts.COLUMNS * 4);
-        int from = pager.from();
-        int to = pager.to(entries.size());
+        GuiPager pager = GuiPager.of(page, entries.size(), GuiLayouts.COLUMNS * 4);
+        page = pager.currentPage();
         int row = 1;
         int col = 0;
-        for (int i = from; i < to; i++) {
-            CosmeticCatalog.Entry entry = entries.get(i);
+        for (CosmeticCatalog.Entry entry : pager.slice(entries)) {
             final String key = entry.key();
-            ItemStack icon = entry.icon().clone();
+            // Use the catalog label fallback so data-pack entries are not shown as blank icons.
+            ItemStack icon = GuiTheme.named(entry.icon().getType(), GuiTheme.TEXT + "<bold>",
+                    entry.label(), GuiTheme.dim(key), GuiTheme.hint("Click", "select"));
             String selected = trimMaterialStep ? selectedTrimMaterial : selectedTrimPattern;
             if (key.equals(selected)) {
                 icon = GuiTheme.glow(icon);
@@ -128,6 +156,20 @@ public final class CustomizePage extends GuiScreen {
             col++;
             if (col >= GuiLayouts.COLUMNS) { col = 0; row++; }
         }
+        if (pager.maxPages() > 1) {
+            int prev = Math.max(0, page - 1);
+            int next = Math.min(page + 1, pager.maxPages() - 1);
+            addTrimPager(content, 51, GuiTheme.arrow(false, prev, pager.maxPages()), prev);
+            addTrimPager(content, 52, GuiTheme.arrow(true, next, pager.maxPages()), next);
+        }
+    }
+
+    private void addTrimPager(StaticPane pane, int slot, ItemStack icon, int target) {
+        pane.addItem(wrap(icon, (p, e) -> {
+            SoundManager.playClick(p);
+            page = target;
+            refresh();
+        }, player), slot % GuiLayouts.COLUMNS, slot / GuiLayouts.COLUMNS);
     }
 
     @Override
@@ -155,8 +197,7 @@ public final class CustomizePage extends GuiScreen {
             chrome.addItem(wrap(GuiTheme.named(Material.SHEARS, GuiTheme.MUTED + "<bold>", "Remove trim",
                     GuiTheme.dim("Remove trim from the selected armor"), GuiTheme.hint("Click", "remove")), (p, e) -> {
                 SoundManager.playClick(p);
-                CustomizeRules rules = CustomizeRules.parse(
-                        gui.kits().config().getConfigurationSection("customize"));
+                CustomizeRules rules = rules();
                 CosmeticValidator validator = new CosmeticValidator(rules);
                 ItemStack target = session.target();
                 if (!validator.isArmor(target)) {
@@ -180,20 +221,17 @@ public final class CustomizePage extends GuiScreen {
         if (preview == null) {
             preview = new ItemStack(Material.GRAY_DYE);
         }
-        // Stage trim onto preview if both chosen
-        if (selectedTrimPattern != null && selectedTrimMaterial != null && preview.getItemMeta() instanceof ArmorMeta) {
+        // Stage trim onto preview if both chosen; the preview is cosmetic, so a bad target
+        // simply keeps the untrimmed item rather than breaking the screen.
+        TrimChoice choice = resolveTrimChoice(selectedTrimPattern, selectedTrimMaterial);
+        if (choice != null) {
             try {
-                RegistryAccess access = RegistryAccess.registryAccess();
-                Registry<TrimPattern> patternReg = access.getRegistry(RegistryKey.TRIM_PATTERN);
-                Registry<TrimMaterial> materialReg = access.getRegistry(RegistryKey.TRIM_MATERIAL);
-                TrimPattern tp = patternReg.get(NamespacedKey.fromString(selectedTrimPattern));
-                TrimMaterial tm = materialReg.get(NamespacedKey.fromString(selectedTrimMaterial));
-                if (tp != null && tm != null) {
-                    ArmorMeta am = (ArmorMeta) preview.getItemMeta();
-                    am.setTrim(new ArmorTrim(tm, tp));
-                    preview.setItemMeta(am);
-                }
-            } catch (RuntimeException ignored) { }
+                CustomizeRules previewRules = rules();
+                preview = applier(previewRules, new CosmeticValidator(previewRules))
+                        .applyTrim(preview, choice.material(), choice.pattern());
+            } catch (IllegalArgumentException ignored) {
+                // Preview only: never fail the whole screen for an incompatible target.
+            }
         }
         chrome.addItem(new GuiItem(preview), GuiLayouts.CUSTOMIZE_PREVIEW_SLOT % GuiLayouts.COLUMNS,
                 GuiLayouts.CUSTOMIZE_PREVIEW_SLOT / GuiLayouts.COLUMNS);
@@ -203,8 +241,7 @@ public final class CustomizePage extends GuiScreen {
                 GuiTheme.dim("Commit staged changes")), (p, e) -> {
             SoundManager.playClick(p);
             if (writePending) return;
-            CustomizeRules rules = CustomizeRules.parse(
-                    gui.kits().config().getConfigurationSection("customize"));
+            CustomizeRules rules = rules();
             if (!rules.enabled()) {
                 gui.kits().lang().send(p, "error.cosmetics-disabled");
                 return;
@@ -214,23 +251,29 @@ public final class CustomizePage extends GuiScreen {
                 gui.kits().lang().send(p, "error.cosmetics-kit-changed");
                 return;
             }
-            // Stage trim if both chosen before committing
+            CosmeticValidator validator = new CosmeticValidator(rules);
+            for (ItemStack item : session.working()) {
+                if (validator.isShield(item) && validator.hasUnreadableBannerLayers(item)) {
+                    gui.kits().lang().send(p, "error.cosmetics-banner-locked");
+                    return;
+                }
+            }
+            // Stage trim if both chosen before committing. A key that can no longer be resolved
+            // is a failure, not a silent no-op that would save an untrimmed item.
             if (selectedTrimPattern != null && selectedTrimMaterial != null) {
+                TrimChoice chosen = resolveTrimChoice(selectedTrimPattern, selectedTrimMaterial);
                 ItemStack target = session.target();
-                if (target != null && target.getItemMeta() instanceof ArmorMeta) {
-                    try {
-                        RegistryAccess access = RegistryAccess.registryAccess();
-                        Registry<TrimPattern> patternReg = access.getRegistry(RegistryKey.TRIM_PATTERN);
-                        Registry<TrimMaterial> materialReg = access.getRegistry(RegistryKey.TRIM_MATERIAL);
-                        TrimPattern tp = patternReg.get(NamespacedKey.fromString(selectedTrimPattern));
-                        TrimMaterial tm = materialReg.get(NamespacedKey.fromString(selectedTrimMaterial));
-                        if (tp != null && tm != null) {
-                            ArmorMeta am = (ArmorMeta) target.getItemMeta();
-                            am.setTrim(new ArmorTrim(tm, tp));
-                            target.setItemMeta(am);
-                            session.stageTarget(target);
-                        }
-                    } catch (RuntimeException ignored) { }
+                if (chosen == null || target == null || !validator.isArmor(target)) {
+                    gui.kits().lang().send(p, chosen == null
+                            ? "error.cosmetics-save-failed" : "error.cosmetics-not-armor");
+                    return;
+                }
+                try {
+                    session.stageTarget(applier(rules, validator)
+                            .applyTrim(target, chosen.material(), chosen.pattern()));
+                } catch (IllegalArgumentException ex) {
+                    gui.kits().lang().send(p, "error.cosmetics-save-failed");
+                    return;
                 }
             }
             // Register without clearing a reload stale marker, then commit through the
@@ -280,17 +323,31 @@ public final class CustomizePage extends GuiScreen {
                     GuiTheme.hint("Click", "open")), (p, e) -> {
                 SoundManager.playClick(p);
                 if ("Banner".equals(tab)) {
-                    mode = Mode.BANNER;
-                    if (session.targetSlot() != CosmeticTarget.SHIELD.index()) {
-                        session.selectTarget(CosmeticTarget.SHIELD.index());
+                    // Validate first: a failed entry must not leave this screen in a mode with
+                    // no picker and with the shield target selected by accident.
+                    CustomizeRules tabRules = rules();
+                    if (!tabRules.enabled()) {
+                        gui.kits().lang().send(p, "error.cosmetics-disabled");
+                        return;
                     }
-                    ItemStack target = session.target();
-                    if (target == null || target.getType().isAir()) {
+                    CosmeticValidator validator = new CosmeticValidator(tabRules);
+                    ItemStack shield = session.working()[CosmeticTarget.SHIELD.index()];
+                    if (!validator.isShield(shield)) {
                         gui.kits().lang().send(p, "error.cosmetics-not-shield");
                         return;
                     }
+                    if (validator.hasUnreadableBannerLayers(shield)) {
+                        gui.kits().lang().send(p, "error.cosmetics-banner-locked");
+                        return;
+                    }
+                    session.selectTarget(CosmeticTarget.SHIELD.index());
+                    mode = Mode.BANNER;
                     BannerDesignerPage.open(gui, p, session, kitSlot);
                 } else if ("Rename".equals(tab)) {
+                    if (!rules().enabled()) {
+                        gui.kits().lang().send(p, "error.cosmetics-disabled");
+                        return;
+                    }
                     mode = Mode.RENAME;
                     RenameTargetPage.open(gui, p, session, kitSlot);
                 } else {
@@ -328,6 +385,7 @@ public final class CustomizePage extends GuiScreen {
         selectedTrimPattern = null;
         selectedTrimMaterial = null;
         trimMaterialStep = false;
+        page = 0;
     }
 
     @Override
@@ -339,11 +397,14 @@ public final class CustomizePage extends GuiScreen {
     protected void configure(com.github.stefvanschie.inventoryframework.gui.type.ChestGui chest) {
         chest.setOnClose(event -> {
             if (!(event.getPlayer() instanceof Player closer)) return;
-            gui.unregisterCustomizeScreen(closer.getUniqueId());
+            UUID viewer = closer.getUniqueId();
+            gui.unregisterCustomizeScreen(viewer);
             if (writePending) {
                 // The queued write keeps its clone; only feedback and pending state are dropped.
-                gui.clearPendingCustomize(closer.getUniqueId());
-            } else {
+                gui.clearPendingCustomize(viewer);
+            } else if (gui.isLastCustomizeScreen(viewer)) {
+                // Opening a Banner/Rename tab registers the incoming screen before this one
+                // closes, so only a genuine close (or Back, which discards explicitly) resets.
                 session.discard();
             }
         });

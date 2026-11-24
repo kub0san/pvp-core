@@ -275,4 +275,15 @@ class CustomizeServiceTest {
         }));
         assertDoesNotThrow(() -> pendingWrite.complete(null));
     }
+
+    @Test
+    void emptyKitSnapshotMatchesFreshEmptyReadAtApply() {
+        session = new CustomizeSession(new ItemStack[0]);
+        reader = (p, slot) -> null; // a kit that was never saved reads back as null
+
+        assertEquals(ApplyResult.QUEUED, service().commit(player, 1, session));
+        assertEquals(1, saves.get());
+        assertNotNull(savedKit.get());
+        assertEquals(41, savedKit.get().length);
+    }
 }

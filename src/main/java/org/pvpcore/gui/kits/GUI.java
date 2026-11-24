@@ -165,6 +165,20 @@ public class GUI implements GuiSession {
         openCustomizeScreens.computeIfPresent(viewer, (key, count) -> count <= 1 ? null : count - 1);
     }
 
+    /** Number of customize-family screens currently open for this viewer. */
+    public int customizeScreenCount(UUID viewer) {
+        return viewer == null ? 0 : openCustomizeScreens.getOrDefault(viewer, 0);
+    }
+
+    /**
+     * True when no other customize-family screen is open for the viewer. A screen checks this
+     * after unregistering itself: during a tab switch the incoming screen is registered first,
+     * so its close handler must not discard the session's staged changes.
+     */
+    public boolean isLastCustomizeScreen(UUID viewer) {
+        return customizeScreenCount(viewer) <= 0;
+    }
+
     public void clearPendingCustomize(UUID viewer) {
         if (viewer == null) return;
         pendingCustomize.remove(viewer);

@@ -13,6 +13,7 @@ import org.pvpcore.features.kits.cosmetics.CustomizeSession;
 import org.pvpcore.gui.base.GuiChatPrompt;
 import org.pvpcore.gui.base.GuiGuard;
 import org.pvpcore.gui.base.GuiLayouts;
+import org.pvpcore.gui.base.GuiMenuFactory;
 import org.pvpcore.gui.base.GuiScreen;
 import org.pvpcore.gui.base.GuiTheme;
 import org.pvpcore.gui.kits.GUI;
@@ -38,14 +39,21 @@ public final class RenameTargetPage extends GuiScreen {
     }
 
     public static void open(GUI gui, Player player, CustomizeSession session, int kitSlot) {
-        if (session == null) return;
+        if (session == null || gui == null || player == null) return;
+        if (gui.kits() == null) return;
         if (!org.pvpcore.commands.kits.core.ActionGuards.allowed(player, "perplayerkit.kit", LocationFeature.KITS)) return;
+        CustomizeRules rules = CustomizeRules.parse(gui.kits().config().getConfigurationSection("customize"));
+        if (!rules.enabled()) {
+            gui.kits().lang().send(player, "error.cosmetics-disabled");
+            return;
+        }
         new RenameTargetPage(gui, player, session, kitSlot).show();
     }
 
     @Override
     protected String title() {
-        return GuiTheme.ACCENT + "<bold>Rename Item";
+        if (kits() == null) return "Rename Item";
+        return GuiMenuFactory.sectionTitle(kits(), GuiTheme.ACCENT + "<bold>Rename Item");
     }
 
     @Override
@@ -83,12 +91,14 @@ public final class RenameTargetPage extends GuiScreen {
                             CustomizeSession taken = gui.takePendingCustomize(p.getUniqueId(), opId);
                             if (taken == null) return;
                             try {
-                                net.kyori.adventure.text.Component parsed = validator.parseName(text);
+                                // applyName parses once and clones before writing; the session
+                                // stays untouched when validation fails.
                                 ItemStack current = taken.target();
                                 if (current != null) {
-                                    ItemStack staged = applier.applyName(current, text);
-                                    taken.stageTarget(staged);
+                                    taken.stageTarget(applier.applyName(current, text));
                                 }
+                            } catch (CosmeticValidator.BlockedTagException ex) {
+                                gui.kits().lang().send(p, "error.cosmetics-name-tag-blocked");
                             } catch (IllegalArgumentException ex) {
                                 gui.kits().lang().send(p, "error.cosmetics-name-invalid");
                             }

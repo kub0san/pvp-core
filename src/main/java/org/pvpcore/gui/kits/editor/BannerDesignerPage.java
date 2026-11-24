@@ -13,6 +13,7 @@ import org.pvpcore.features.kits.cosmetics.CosmeticValidator;
 import org.pvpcore.features.kits.cosmetics.CustomizeSession;
 import org.pvpcore.gui.base.GuiGuard;
 import org.pvpcore.gui.base.GuiLayouts;
+import org.pvpcore.gui.base.GuiMenuFactory;
 import org.pvpcore.gui.base.GuiScreen;
 import org.pvpcore.gui.base.GuiTheme;
 import org.pvpcore.gui.kits.GUI;
@@ -57,9 +58,13 @@ public final class BannerDesignerPage extends GuiScreen {
     /** Reopen with the live design (pattern-picker return); {@code design} is never null here. */
     public static void open(GUI gui, Player player, CustomizeSession session, int kitSlot,
                             BannerDesign design) {
-        if (session == null || player == null || gui == null) return;
+        if (session == null || player == null || gui == null || gui.kits() == null) return;
         if (!org.pvpcore.commands.kits.core.ActionGuards.allowed(
                 player, "perplayerkit.kit", LocationFeature.KITS)) return;
+        if (!rulesOf(gui).enabled()) {
+            gui.kits().lang().send(player, "error.cosmetics-disabled");
+            return;
+        }
         ItemStack target = session.target();
         if (target == null || target.getType() != Material.SHIELD) {
             gui.kits().lang().send(player, "error.cosmetics-not-shield");
@@ -78,7 +83,8 @@ public final class BannerDesignerPage extends GuiScreen {
 
     @Override
     protected String title() {
-        return GuiTheme.ACCENT + "<bold>Banner Designer";
+        if (kits() == null) return "Banner Designer";
+        return GuiMenuFactory.sectionTitle(kits(), GuiTheme.ACCENT + "<bold>Banner Designer");
     }
 
     @Override

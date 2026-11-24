@@ -7,6 +7,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockbukkit.mockbukkit.MockBukkit;
 
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -105,5 +106,48 @@ class CustomizeSessionTest {
         assertNull(session.target());
         session.resetTarget();
         assertFalse(session.isStaged(3));
+    }
+
+    @Test
+    void emptyKitIsNormalizedToFortyOneEmptySlots() {
+        for (ItemStack[] empty : new ItemStack[][]{null, new ItemStack[0]}) {
+            CustomizeSession session = new CustomizeSession(empty);
+
+            assertEquals(41, session.working().length);
+            assertDoesNotThrow(() -> session.selectTarget(40)); // banner/offhand target
+            assertNull(session.target());
+            assertNull(session.working()[40]);
+            assertTrue(session.matchesCurrent(new ItemStack[0])); // stale compare at Apply
+            assertTrue(session.matchesCurrent(null));
+        }
+    }
+
+    @Test
+    void shortKitIsPaddedWithoutMutatingTheSource() {
+        ItemStack[] source = new ItemStack[]{new ItemStack(Material.DIAMOND_CHESTPLATE)};
+        CustomizeSession session = new CustomizeSession(source);
+
+        assertEquals(41, session.working().length);
+        assertEquals(1, source.length); // the caller's array is untouched
+        session.selectTarget(0);
+        assertEquals(Material.DIAMOND_CHESTPLATE, session.target().getType());
+        assertNull(session.working()[40]);
+        assertTrue(session.matchesCurrent(source)); // an equivalent short read is still current
+    }
+
+    @Test
+    void openingEmptyKitScreensNeverMutatesSavedData() {
+        ItemStack[] saved = new ItemStack[0];
+        CustomizeSession session = new CustomizeSession(saved);
+
+        session.selectTarget(40); // banner tab
+        assertNull(session.target()); // designer refuses a non-shield without touching the kit
+        session.selectTarget(0); // rename target row
+        session.stageTarget(new ItemStack(Material.STONE));
+        session.discard();
+
+        assertEquals(0, saved.length);
+        assertTrue(session.matchesCurrent(saved));
+        assertNull(session.working()[0]);
     }
 }

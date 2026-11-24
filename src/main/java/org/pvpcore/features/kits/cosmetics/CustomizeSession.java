@@ -3,6 +3,7 @@ package org.pvpcore.features.kits.cosmetics;
 import org.bukkit.inventory.ItemStack;
 import org.pvpcore.features.kits.KitContents;
 
+import java.util.Arrays;
 import java.util.Objects;
 
 /**
@@ -17,7 +18,9 @@ public final class CustomizeSession {
     private int targetSlot = -1;
 
     public CustomizeSession(ItemStack[] source) {
-        ItemStack[] snapshot = source == null ? new ItemStack[0] : source;
+        // A kit that has never been saved is represented by a null/short array. Cosmetic GUIs
+        // address all 41 kit slots, so normalize once here instead of special-casing each screen.
+        ItemStack[] snapshot = normalize(source);
         this.original = KitContents.copy(snapshot);
         this.working = KitContents.copy(snapshot);
         this.staged = new boolean[snapshot.length];
@@ -77,9 +80,10 @@ public final class CustomizeSession {
      * deliberately do not count: a fresh kit read must equal what the player started from.
      */
     public boolean matchesCurrent(ItemStack[] current) {
-        if (current == null || current.length != original.length) return false;
+        ItemStack[] fresh = normalize(current);
+        if (fresh.length != original.length) return false;
         for (int i = 0; i < original.length; i++) {
-            if (!Objects.equals(original[i], current[i])) return false;
+            if (!Objects.equals(original[i], fresh[i])) return false;
         }
         return true;
     }
@@ -88,6 +92,17 @@ public final class CustomizeSession {
         if (targetSlot < 0 || targetSlot >= working.length) {
             throw new IllegalStateException("No kit target selected");
         }
+    }
+
+    /**
+     * Pads a null/short kit array to the 41 slots every cosmetic screen addresses. Longer arrays
+     * are left alone so a genuine layout change is still reported as stale at Apply. Ownership
+     * stays with the caller: the constructor takes its own clones and comparisons are read-only.
+     */
+    private static ItemStack[] normalize(ItemStack[] source) {
+        int length = source == null ? 0 : source.length;
+        return Arrays.copyOf(source == null ? new ItemStack[0] : source,
+                Math.max(KitContents.INVENTORY_SIZE, length));
     }
 
     private static ItemStack copy(ItemStack item) {

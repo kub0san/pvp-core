@@ -16,6 +16,7 @@ import org.pvpcore.features.kits.cosmetics.CosmeticValidator;
 import org.pvpcore.features.kits.cosmetics.CustomizeSession;
 import org.pvpcore.gui.base.GuiGuard;
 import org.pvpcore.gui.base.GuiLayouts;
+import org.pvpcore.gui.base.GuiMenuFactory;
 import org.pvpcore.gui.base.GuiPager;
 import org.pvpcore.gui.base.GuiScreen;
 import org.pvpcore.gui.base.GuiTheme;
@@ -78,7 +79,8 @@ public final class BannerPatternPickerPage extends GuiScreen {
 
     @Override
     protected String title() {
-        return GuiTheme.ACCENT + "<bold>Pick Pattern";
+        if (kits() == null) return "Pick Pattern";
+        return GuiMenuFactory.sectionTitle(kits(), GuiTheme.ACCENT + "<bold>Pick Pattern");
     }
 
     @Override

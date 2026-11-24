@@ -20,6 +20,17 @@ import java.util.Objects;
 
 /** Validation for cosmetic inputs: item types, strict name tags and banner readability. */
 public final class CosmeticValidator {
+    /** Distinguishes a rejected formatting tag from other malformed names at the call site. */
+    public static final class BlockedTagException extends IllegalArgumentException {
+        BlockedTagException(String message) {
+            super(message);
+        }
+
+        BlockedTagException(String message, Throwable cause) {
+            super(message, cause);
+        }
+    }
+
     private final CustomizeRules rules;
 
     public CosmeticValidator(CustomizeRules rules) {
@@ -58,7 +69,7 @@ public final class CosmeticValidator {
             public Tag resolve(String name, ArgumentQueue arguments, Context context) {
                 Tag tag = allowed.resolve(name, arguments, context);
                 if (tag == null) {
-                    throw new IllegalArgumentException("Cosmetic name tag is not allowed: " + name);
+                    throw new BlockedTagException("Cosmetic name tag is not allowed: " + name);
                 }
                 return tag;
             }
@@ -72,9 +83,12 @@ public final class CosmeticValidator {
         MiniMessage miniMessage = MiniMessage.builder().tags(rejecting).strict(true).build();
         try {
             return miniMessage.deserialize(raw);
-        } catch (IllegalArgumentException e) {
-            throw e;
         } catch (RuntimeException e) {
+            // The parser may wrap a resolver failure; keep the blocked-tag signal intact.
+            for (Throwable cause = e; cause != null; cause = cause.getCause()) {
+                if (cause instanceof BlockedTagException blocked) throw blocked;
+            }
+            if (e instanceof IllegalArgumentException invalid) throw invalid;
             throw new IllegalArgumentException("Invalid cosmetic name", e);
         }
     }
