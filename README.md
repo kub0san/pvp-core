@@ -23,7 +23,7 @@ Optional dependencies fail closed: if PacketEvents, WorldGuard, Multiverse-Core 
 ## Testing
 
 - Shared test server: `C:\Tools\global-test-server-26.3` (Leaf 26.3-27, Java 25, game port 25566). Canonical guide: `C:\Projects\GLOBAL_TEST_SERVER.md`.
-- From that folder: `.\TestServer.ps1 setup`, `deploy pvp-core`, `restart`, `verify`, `snapshot`, `reset`, `stop`. `.\TestServer.ps1 -Help` prints the full command table and MCP map.
+- From that folder: `.\TestServer.ps1 setup`, `deploy pvp-core`, `restart`, `status`, `verify`, `snapshot`, `reset`, `stop`. `.\TestServer.ps1 -Help` prints the full command table and MCP map.
 - Player data is scrubbed except qcart (`befc5d95-fd63-4cae-b0f5-7c2fb271c699`). Craftwire is the primary E2E tool; a green handshake is not a pass.
 
 ## Building
