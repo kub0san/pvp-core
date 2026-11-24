@@ -115,5 +115,13 @@ public final class BannerDesignerPage extends GuiScreen {
 
     @Override
     protected void configure(com.github.stefvanschie.inventoryframework.gui.type.ChestGui chest) {
+        chest.setOnTopClick(event -> {
+            if (event.getRawSlot() != GuiLayouts.BANNER_TEMPLATE_SLOT) return;
+            event.setCancelled(true);
+            org.bukkit.inventory.ItemStack cursor = event.getCursor();
+            if (cursor == null || cursor.getType().isAir()) return;
+            if (!(cursor.getItemMeta() instanceof org.bukkit.inventory.meta.BannerMeta)) return;
+            try { design = BannerDesign.from(cursor); refresh(); } catch (RuntimeException ignored) { }
+        });
     }
 }
