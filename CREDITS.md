@@ -4,7 +4,7 @@ PvPCore is built on the work of these projects and people. Thank you.
 
 ## PvPCore
 
-- Project: PvPCore
+- Project: pvp-core
 - License: GNU General Public License v3.0 (see `LICENSE`)
 
 ## CombatLog

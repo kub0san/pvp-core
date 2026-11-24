@@ -1,1 +1,1 @@
-rootProject.name = "PvpCore"
+rootProject.name = "pvp-core"

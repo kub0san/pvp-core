@@ -26,7 +26,7 @@ Optional dependencies fail closed: if PacketEvents, WorldGuard, Multiverse-Core 
 .\gradlew.bat clean shadowJar
 ```
 
-The shaded jar is written to `build/libs/PvpCore-1.0-SNAPSHOT.jar`. Drop it into your server's `plugins/` folder.
+The shaded jar is written to `build/libs/pvp-core-1.0-SNAPSHOT.jar`. Drop it into your server's `plugins/` folder.
 
 Run verification with:
 
