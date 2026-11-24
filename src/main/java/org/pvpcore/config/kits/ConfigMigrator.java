@@ -71,6 +71,8 @@ public class ConfigMigrator {
             ItemFilterRules.parse(updated);
             org.pvpcore.util.kits.LocationRules.parse(updated);
             org.pvpcore.util.kits.RekitKitResolver.validate(updated);
+            CustomizeRules.parse(updated.getConfigurationSection("customize"),
+                    warning -> plugin.getLogger().warning(warning));
             changes.put(configFile, updated);
             for (Path file : changes.keySet()) {
                 if (Files.exists(file)) backups.put(file, ConfigFiles.backup(file));
