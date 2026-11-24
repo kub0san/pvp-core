@@ -4,11 +4,11 @@ import org.pvpcore.util.kits.IDUtil;
 
 import org.bukkit.inventory.ItemStack;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 /**
  * In-memory kit cache and public-kit registry. Package-private helper owned by {@link KitManager};
@@ -16,7 +16,9 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 final class KitCache {
     private final Map<String, ItemStack[]> kits = new ConcurrentHashMap<>();
-    private final List<PublicKit> publicKits = new ArrayList<>();
+    // Exposed by getPublicKitList() and iterated from async snapshot reads while the main
+    // thread registers/removes public kits; a plain ArrayList throws ConcurrentModificationException.
+    private final List<PublicKit> publicKits = new CopyOnWriteArrayList<>();
 
     ItemStack[] getRaw(String id) {
         return kits.get(id);
