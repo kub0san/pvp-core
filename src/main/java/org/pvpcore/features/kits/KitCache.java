@@ -81,6 +81,15 @@ final class KitCache {
         return publicKits.remove(kit);
     }
 
+    /**
+     * Clears the public-kit registry and any cached public-kit contents. Used on reload
+     * so kits removed from config do not linger in the contents map.
+     */
+    void clearPublicKits() {
+        publicKits.clear();
+        kits.keySet().removeIf(id -> id.startsWith("public"));
+    }
+
     boolean hasPublicKit(String id) {
         return kits.containsKey(IDUtil.getPublicKitId(id));
     }

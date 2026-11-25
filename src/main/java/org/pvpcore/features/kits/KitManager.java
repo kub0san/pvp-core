@@ -132,6 +132,10 @@ public class KitManager {
         return cache.getPublicKitList();
     }
 
+    public void clearPublicKits() {
+        cache.clearPublicKits();
+    }
+
     /**
      * Refreshes a cached kit after its stored data was rewritten externally
      * (e.g. by an admin item purge). Passing null removes the cached entry;
