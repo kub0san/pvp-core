@@ -64,6 +64,17 @@ class KitListPageTest {
     }
 
     @Test
+    void zeroOrNegativeMaxKitsStillShowsExactlyOneSlot() {
+        KitListPage.VisibleSlots zero = KitListPage.visibleSlots(0, 0);
+        assertEquals(1, zero.first());
+        assertEquals(1, zero.last());
+
+        KitListPage.VisibleSlots negative = KitListPage.visibleSlots(0, -3);
+        assertEquals(1, negative.first());
+        assertEquals(1, negative.last());
+    }
+
+    @Test
     void allElevenPagesCoverSlotsOneToNinetyNineExactlyOnce() {
         List<Integer> seen = new ArrayList<>();
         for (int page = 0; page < 11; page++) {

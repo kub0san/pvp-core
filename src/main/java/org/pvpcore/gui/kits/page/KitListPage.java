@@ -63,18 +63,20 @@ public final class KitListPage extends GuiScreen {
     /**
      * Inclusive 1-based slot range painted on one dashboard page. Immutable by virtue
      * of being a record, and package-private so the range can be tested without a server.
-     * The page is clamped to the same valid range as the pager; {@code maxKits} is
-     * expected to arrive already clamped to 1..99 by KitsContext.maxKits().
+     * The page is clamped to the same valid range as the pager. {@code maxKits} is
+     * clamped to at least 1 here so the pure seam never returns an inverted range,
+     * even though KitsContext.maxKits() already guarantees 1..99 in production.
      */
     record VisibleSlots(int first, int last) {
     }
 
     static VisibleSlots visibleSlots(int page, int maxKits) {
         int perPage = GuiLayouts.DASH_SLOTS_PER_PAGE;
-        int maxPages = Math.max(1, (maxKits + perPage - 1) / perPage);
+        int clampedMaxKits = Math.max(1, maxKits);
+        int maxPages = Math.max(1, (clampedMaxKits + perPage - 1) / perPage);
         int clampedPage = Math.max(0, Math.min(page, maxPages - 1));
         int first = clampedPage * perPage + 1;
-        int last = Math.min(maxKits, first + perPage - 1);
+        int last = Math.min(clampedMaxKits, first + perPage - 1);
         return new VisibleSlots(first, last);
     }
 
