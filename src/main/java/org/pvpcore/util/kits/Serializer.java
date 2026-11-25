@@ -107,7 +107,7 @@ public final class Serializer {
                 totalBytes += itemLength;
 
                 try {
-                    items[i] = ItemStack.deserializeBytes(itemBytes);
+                    items[i] = sanitize(ItemStack.deserializeBytes(itemBytes));
                 } catch (Exception ex) {
                     // If a single item fails to deserialize (e.g., modded NBT),
                     // set it to null instead of crashing the whole kit.
@@ -135,7 +135,7 @@ public final class Serializer {
             ItemStack[] items = new ItemStack[length];
             for (int i = 0; i < length; i++) {
                 try {
-                    items[i] = (ItemStack) input.readObject();
+                    items[i] = sanitize((ItemStack) input.readObject());
                 } catch (Exception ex) {
                     items[i] = null;
                 }
@@ -145,5 +145,20 @@ public final class Serializer {
             // If it fails both formats, it's unreadable. Return empty.
             return new ItemStack[0];
         }
+    }
+
+    /**
+     * Clamps a deserialized stack's amount to its type's max stack size and drops
+     * stacks with a non-positive amount. Guards against oversized/corrupt blobs
+     * bypassing the (default-off) item filter.
+     */
+    private static ItemStack sanitize(ItemStack item) {
+        if (item == null) return null;
+        if (item.getAmount() <= 0) return null;
+        int max = item.getMaxStackSize();
+        if (max > 0 && item.getAmount() > max) {
+            item.setAmount(max);
+        }
+        return item;
     }
 }
