@@ -10,7 +10,6 @@ import org.pvpcore.PvPCorePlugin;
 import org.pvpcore.module.PvPCoreModule;
 
 import java.lang.reflect.Method;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
@@ -34,11 +33,9 @@ public final class GenerationModule implements PvPCoreModule {
     /**
      * Loaded from {@code worldgen.expected-worlds} on enable and reload.
      *
-     * <p>Kept local rather than on {@link WorldGenSettings} so the "missing generator" check
-     * stays self-contained and does not depend on that class growing a new accessor. Move it
-     * into {@code WorldGenSettings} if you decide the settings class should own every key.</p>
+     * <p>Kept local to this module; {@link WorldGenSettings} no longer duplicates it.</p>
      */
-    private final Set<String> expectedWorlds = new HashSet<>();
+    private volatile Set<String> expectedWorlds = Set.of();
 
     private WorldSettingsListener listener;
 
@@ -178,18 +175,20 @@ public final class GenerationModule implements PvPCoreModule {
     }
 
     private void loadExpectedWorlds() {
-        expectedWorlds.clear();
         org.bukkit.configuration.file.FileConfiguration worldgenConfig = org.pvpcore.config.worldgen.WorldgenConfig.load(plugin);
         ConfigurationSection section = worldgenConfig;
         if (section == null) {
+            expectedWorlds = Set.of();
             return;
         }
         List<String> list = section.getStringList("expected-worlds");
+        java.util.Set<String> tmp = new java.util.HashSet<>();
         for (String w : list) {
             if (w != null && !w.isEmpty()) {
-                expectedWorlds.add(w);
+                tmp.add(w);
             }
         }
+        expectedWorlds = java.util.Set.copyOf(tmp);
     }
 
     /**

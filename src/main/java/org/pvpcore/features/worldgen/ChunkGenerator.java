@@ -106,7 +106,7 @@ final class ChunkGenerator extends org.bukkit.generator.ChunkGenerator {
                     if (y >= maxY) continue;
                     double chance = BEDROCK_GRADIENT_NUMERATOR[k]
                             / (double) BEDROCK_GRADIENT_DENOMINATOR;
-                    if (positionHash01(worldX, y, worldZ, seed) < chance) {
+                    if (NoiseHelper.positionHash01(worldX, y, worldZ, seed) < chance) {
                         data.setBlock(lx, y, lz, Material.BEDROCK);
                     } else {
                         data.setBlock(lx, y, lz, y <= 0 ? Material.DEEPSLATE : Material.STONE);
@@ -130,7 +130,7 @@ final class ChunkGenerator extends org.bukkit.generator.ChunkGenerator {
                         data.setBlock(lx, y, lz, Material.DEEPSLATE);
                     } else {
                         double chance = 1.0 - (double) y / DEEPSLATE_TRANSITION_TOP;
-                        if (chance > 0.0 && positionHash01(worldX, y, worldZ, seed) < chance) {
+                        if (chance > 0.0 && NoiseHelper.positionHash01(worldX, y, worldZ, seed) < chance) {
                             data.setBlock(lx, y, lz, Material.DEEPSLATE);
                         }
                     }
@@ -139,16 +139,4 @@ final class ChunkGenerator extends org.bukkit.generator.ChunkGenerator {
         }
     }
 
-    static double positionHash01(int x, int y, int z, long seed) {
-        long h = seed;
-        h ^= (long) x * 0x9E3779B97F4A7C15L;
-        h ^= (long) y * 0xC2B2AE3D27D4EB4FL;
-        h ^= (long) z * 0x165667B19E3779F9L;
-        h ^= (h >>> 33);
-        h *= 0xFF51AFD7ED558CCDL;
-        h ^= (h >>> 33);
-        h *= 0xC4CEB9FE1A85EC53L;
-        h ^= (h >>> 33);
-        return (h & 0xFFFFFFFFL) / (double) 0x100000000L;
-    }
 }

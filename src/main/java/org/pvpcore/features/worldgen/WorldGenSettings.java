@@ -27,7 +27,6 @@ final class WorldGenSettings {
     private volatile boolean allowLocatorBar = false;
     private volatile boolean allowDayCycle = false;
     private volatile long dayTime = 6000L;
-    private volatile Set<String> expectedWorlds = Set.of();
 
     void load(PvPCorePlugin plugin, org.bukkit.configuration.file.FileConfiguration config) {
         ConfigurationSection section = config;
@@ -71,19 +70,12 @@ final class WorldGenSettings {
                     + " is smaller than one chunk; using 16.");
             maxRadius = 16;
         }
-
-        Set<String> expected = Set.of();
-        if (section != null) {
-            List<String> list = section.getStringList("expected-worlds");
-            if (!list.isEmpty()) {
-                Set<String> tmp = new HashSet<>();
-                for (String world : list) {
-                    if (world != null && !world.isEmpty()) {
-                        tmp.add(world);
-                    }
-                }
-                expected = Set.copyOf(tmp);
-            }
+        if (maxRadius * 2L > borderDiameter) {
+            int clamped = borderDiameter / 2;
+            plugin.getLogger().warning("worldgen: world-border-diameter=" + borderDiameter
+                    + " is smaller than 2 * max-radius-blocks=" + maxRadius
+                    + "; clamping max-radius-blocks to " + Math.max(1, clamped) + ".");
+            maxRadius = Math.max(1, clamped);
         }
 
         this.terrain = Map.copyOf(loadedTerrain);
@@ -94,7 +86,6 @@ final class WorldGenSettings {
         this.allowLocatorBar = locatorBar;
         this.allowDayCycle = dayCycle;
         this.dayTime = fixedDayTime;
-        this.expectedWorlds = expected;
     }
 
     private static Terrain readTerrain(PvPCorePlugin plugin, ConfigurationSection worldgen,
@@ -108,7 +99,7 @@ final class WorldGenSettings {
         if (legacyDesert) {
             values = worldgen;
         }
-        String path = legacyDesert ? "worldgen" : "worldgen.biomes." + biome.configPath();
+        String path = legacyDesert ? "worldgen" : "biomes." + biome.configPath();
 
         int surfaceY = values == null ? defaults.surfaceY()
                 : values.getInt("surface-y", defaults.surfaceY());
@@ -179,7 +170,10 @@ final class WorldGenSettings {
     /** Height of the top surface block, shared by the generator and its decorator. */
     int surfaceAt(ArenaBiome biome, long seed, int x, int z, int minY, int maxY) {
         Map<ArenaBiome, Terrain> snapshot = terrain;
-        return biome.terrain().surfaceY(snapshot.get(biome), seed, x, z, minY, maxY);
+        Terrain cfg = snapshot.get(biome);
+        if (cfg == null) cfg = DEFAULTS.get(biome);
+        if (cfg == null) throw new IllegalStateException("No terrain settings for biome " + biome);
+        return biome.terrain().surfaceY(cfg, seed, x, z, minY, maxY);
     }
 
     /** The current terrain settings for one biome. */
@@ -197,8 +191,4 @@ final class WorldGenSettings {
         return !(maxX < -radius || minX > radius || maxZ < -radius || minZ > radius);
     }
 
-    // Phase 2 accessors (stubs; not yet read from config).
-    int pregenChunksPerTick()         { return 2; }
-    long autoResetIntervalHours()     { return 24L; }
-    int autoResetDestroyedThreshold() { return 5000; }
 }
