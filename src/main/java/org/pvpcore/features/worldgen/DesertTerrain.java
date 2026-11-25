@@ -24,7 +24,7 @@ final class DesertTerrain implements TerrainProfile {
 
     @Override
     public void generateSurface(ChunkData data, int lx, int lz, int surface, long seed,
-                                int worldX, int worldZ, WorldGenSettings worldSettings,
+                                int worldX, int worldZ, WorldGenSettings.Snapshot snapshot,
                                 int minY, int maxY) {
         for (int depth = 0; depth < SAND_LAYERS; depth++) {
             int y = surface - depth;
@@ -44,17 +44,17 @@ final class DesertTerrain implements TerrainProfile {
     }
 
     @Override
-    public void decorate(WorldGenSettings settings, WorldInfo info, Random random,
+    public void decorate(WorldGenSettings.Snapshot snapshot, WorldInfo info, Random random,
                          int chunkX, int chunkZ, LimitedRegion region) {
         int baseX = chunkX << 4, baseZ = chunkZ << 4;
-        if (random.nextDouble() < CACTUS_CHANCE)    placeCactus  (settings, info, region, random, baseX, baseZ);
-        if (random.nextDouble() < DEAD_BUSH_CHANCE) placeDeadBush(settings, info, region, random, baseX, baseZ);
+        if (random.nextDouble() < CACTUS_CHANCE)    placeCactus  (snapshot, info, region, random, baseX, baseZ);
+        if (random.nextDouble() < DEAD_BUSH_CHANCE) placeDeadBush(snapshot, info, region, random, baseX, baseZ);
     }
 
-    private void placeCactus(WorldGenSettings settings, WorldInfo info, LimitedRegion region,
+    private void placeCactus(WorldGenSettings.Snapshot snapshot, WorldInfo info, LimitedRegion region,
                              Random random, int baseX, int baseZ) {
         int x = baseX + random.nextInt(16), z = baseZ + random.nextInt(16);
-        int sy = settings.surfaceAt(ArenaBiome.DESERT, info.getSeed(), x, z,
+        int sy = WorldGenSettings.surfaceAt(snapshot, ArenaBiome.DESERT, info.getSeed(), x, z,
                                     info.getMinHeight(), info.getMaxHeight());
         if (region.getType(x, sy, z) != Material.SAND) return;
         for (int[] d : new int[][]{{1,0},{-1,0},{0,1},{0,-1}})
@@ -66,10 +66,10 @@ final class DesertTerrain implements TerrainProfile {
         }
     }
 
-    private void placeDeadBush(WorldGenSettings settings, WorldInfo info, LimitedRegion region,
+    private void placeDeadBush(WorldGenSettings.Snapshot snapshot, WorldInfo info, LimitedRegion region,
                                Random random, int baseX, int baseZ) {
         int x = baseX + random.nextInt(16), z = baseZ + random.nextInt(16);
-        int sy = settings.surfaceAt(ArenaBiome.DESERT, info.getSeed(), x, z,
+        int sy = WorldGenSettings.surfaceAt(snapshot, ArenaBiome.DESERT, info.getSeed(), x, z,
                                     info.getMinHeight(), info.getMaxHeight());
         if (region.getType(x, sy, z) == Material.SAND && region.getType(x, sy + 1, z).isAir())
             region.setBlockData(x, sy + 1, z, Material.DEAD_BUSH.createBlockData());

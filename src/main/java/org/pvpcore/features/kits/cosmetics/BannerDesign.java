@@ -44,8 +44,27 @@ public final class BannerDesign {
         if (!(meta instanceof BannerMeta bannerMeta)) {
             throw new IllegalArgumentException("Item is not a banner or shield");
         }
-        DyeColor base = meta instanceof ShieldMeta shieldMeta ? shieldMeta.getBaseColor() : null;
+        DyeColor base;
+        if (meta instanceof ShieldMeta shieldMeta) {
+            // Shields carry the base in metadata; a null base stays null on a no-op write.
+            base = shieldMeta.getBaseColor();
+        } else {
+            // Banners carry the base in the material name (1.21.11 BannerMeta has no getter).
+            String name = bannerOrShield.getType().name();
+            String suffix = "_BANNER";
+            base = name.endsWith(suffix)
+                    ? dyeFromMaterialName(name.substring(0, name.length() - suffix.length()))
+                    : null;
+        }
         return new BannerDesign(base, bannerMeta.getPatterns());
+    }
+
+    private static DyeColor dyeFromMaterialName(String name) {
+        try {
+            return DyeColor.valueOf(name);
+        } catch (IllegalArgumentException e) {
+            return null; // banner-like material without a dye prefix: leave the base unset
+        }
     }
 
     /** An empty design: no layers and a null base colour. */

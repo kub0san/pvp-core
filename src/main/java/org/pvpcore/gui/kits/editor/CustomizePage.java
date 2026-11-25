@@ -13,6 +13,7 @@ import io.papermc.paper.registry.RegistryAccess;
 import io.papermc.paper.registry.RegistryKey;
 import org.pvpcore.commands.kits.core.ActionGuards;
 import org.pvpcore.config.kits.CustomizeRules;
+import org.pvpcore.features.kits.KitManager;
 import org.pvpcore.features.kits.cosmetics.ApplyResult;
 import org.pvpcore.features.kits.cosmetics.CosmeticApplier;
 import org.pvpcore.features.kits.cosmetics.CosmeticCatalog;
@@ -295,8 +296,15 @@ public final class CustomizePage extends GuiScreen {
                             gui.kits().lang().send(p, "info.cosmetics-applied");
                             ItemEditorPage.openKit(gui, p, kitSlot);
                         } else {
-                            gui.kits().lang().send(p, "error.cosmetics-save-failed");
-                            CustomizePage.reopen(gui, p, kitSlot, taken);
+                            // The write was queued but not confirmed. The cache already holds the
+                            // staged result, so rebase the retained session onto it: otherwise a
+                            // retry is rejected as KIT_CHANGED forever. A null manager or cache
+                            // read keeps the taken session (and its staged edits) intact.
+                            gui.kits().lang().send(p, "error.cosmetics-save-unconfirmed");
+                            KitManager manager = gui.kits().kitManager();
+                            ItemStack[] current = manager == null
+                                    ? null : manager.getPlayerKit(viewer, kitSlot);
+                            CustomizePage.reopen(gui, p, kitSlot, taken.rebaseFrom(current));
                         }
                     }));
             if (result == ApplyResult.QUEUED) {

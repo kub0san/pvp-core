@@ -6,6 +6,7 @@ import org.bukkit.DyeColor;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
+import org.bukkit.inventory.meta.BannerMeta;
 import org.pvpcore.config.kits.CustomizeRules;
 import org.pvpcore.features.kits.cosmetics.BannerDesign;
 import org.pvpcore.features.kits.cosmetics.CosmeticApplier;
@@ -36,7 +37,7 @@ public final class BannerDesignerPage extends GuiScreen {
     private int selectedLayer = -1;
 
     private BannerDesignerPage(GUI gui, Player player, CustomizeSession session, int kitSlot,
-                               BannerDesign initial) {
+                               BannerDesign initial, int selectedLayer) {
         super(gui, player, GuiLayouts.ROWS_EDITOR, org.pvpcore.gui.base.GuiFrame.Density.NONE,
                 "perplayerkit.kit", LocationFeature.KITS);
         this.gui = gui;
@@ -47,17 +48,27 @@ public final class BannerDesignerPage extends GuiScreen {
                 target == null ? new ItemStack(Material.SHIELD) : target);
         this.original = fromShield;
         this.design = initial == null ? fromShield : initial;
+        this.selectedLayer = resumeLayerIndex(this.design, selectedLayer);
         gui.registerCustomizeScreen(player.getUniqueId());
     }
 
     /** Fresh designer: start from the shield's current design. */
     public static void open(GUI gui, Player player, CustomizeSession session, int kitSlot) {
-        open(gui, player, session, kitSlot, null);
+        if (rejectIfStale(gui, player)) return;
+        open(gui, player, session, kitSlot, null, -1);
     }
 
     /** Reopen with the live design (pattern-picker return); {@code design} is never null here. */
     public static void open(GUI gui, Player player, CustomizeSession session, int kitSlot,
                             BannerDesign design) {
+        if (rejectIfStale(gui, player)) return;
+        open(gui, player, session, kitSlot, design, -1);
+    }
+
+    /** Reopen with the live design, keeping the given layer selected. */
+    public static void open(GUI gui, Player player, CustomizeSession session, int kitSlot,
+                            BannerDesign design, int selectedLayer) {
+        if (rejectIfStale(gui, player)) return;
         if (session == null || player == null || gui == null || gui.kits() == null) return;
         if (!org.pvpcore.commands.kits.core.ActionGuards.allowed(
                 player, "perplayerkit.kit", LocationFeature.KITS)) return;
@@ -74,11 +85,30 @@ public final class BannerDesignerPage extends GuiScreen {
             gui.kits().lang().send(player, "error.cosmetics-banner-locked");
             return;
         }
-        new BannerDesignerPage(gui, player, session, kitSlot, design).show();
+        new BannerDesignerPage(gui, player, session, kitSlot, design, selectedLayer).show();
+    }
+
+    /** Whether a cursor item may be adopted as a banner design template. */
+    static boolean isImportableTemplate(ItemStack cursor) {
+        return cursor != null && !cursor.getType().isAir()
+                && cursor.getItemMeta() instanceof BannerMeta;
+    }
+
+    /** Clamps a resumed layer index into the design's range; -1 means no selection. */
+    static int resumeLayerIndex(BannerDesign design, int requested) {
+        if (design == null || requested < 0 || requested >= design.size()) return -1;
+        return requested;
     }
 
     private static CustomizeRules rulesOf(GUI gui) {
         return CustomizeRules.parse(gui.kits().config().getConfigurationSection("customize"));
+    }
+
+    /** Refuses a pre-reload screen before it can construct a new designer/picker screen. */
+    private static boolean rejectIfStale(GUI gui, Player player) {
+        if (gui == null || player == null || !gui.isCustomizeStale(player.getUniqueId())) return false;
+        if (gui.kits() != null) gui.kits().lang().send(player, "error.cosmetics-kit-changed");
+        return true;
     }
 
     @Override
@@ -99,7 +129,7 @@ public final class BannerDesignerPage extends GuiScreen {
             content.addItem(wrap(icon, (p, e) -> {
                 SoundManager.playClick(p);
                 selectedLayer = index;
-                // Editing returns through the picker's open(..., design) overload.
+                // Editing returns through the picker's index-bearing open(..., design, layer) overload.
                 BannerPatternPickerPage.open(gui, p, design, index, session, kitSlot);
             }, player), (GuiLayouts.BANNER_LAYERS_FIRST + i) % GuiLayouts.COLUMNS,
                     (GuiLayouts.BANNER_LAYERS_FIRST + i) / GuiLayouts.COLUMNS);
@@ -244,11 +274,12 @@ public final class BannerDesignerPage extends GuiScreen {
     @Override
     protected void configure(com.github.stefvanschie.inventoryframework.gui.type.ChestGui chest) {
         chest.setOnTopClick(event -> {
-            if (event.getRawSlot() != GuiLayouts.BANNER_TEMPLATE_SLOT) return;
+            // configure() runs after protect(): re-assert readOnly's blanket top-click cancel
+            // before any slot-specific behaviour, so no decorative control is vanilla-pickable.
             event.setCancelled(true);
+            if (event.getRawSlot() != GuiLayouts.BANNER_TEMPLATE_SLOT) return;
             ItemStack cursor = event.getCursor();
-            if (cursor == null || cursor.getType().isAir()) return;
-            if (!(cursor.getItemMeta() instanceof org.bukkit.inventory.meta.BannerMeta)) return;
+            if (!isImportableTemplate(cursor)) return;
             try {
                 design = BannerDesign.from(cursor);
                 selectedLayer = -1;

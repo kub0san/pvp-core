@@ -60,7 +60,11 @@ public final class BannerPatternPickerPage extends GuiScreen {
 
     public static void open(GUI gui, Player player, BannerDesign design, int layerIndex,
                             CustomizeSession session, int kitSlot) {
-        if (design == null || session == null || player == null || gui == null) return;
+        if (design == null || session == null || player == null || gui == null || gui.kits() == null) return;
+        if (gui.isCustomizeStale(player.getUniqueId())) {
+            gui.kits().lang().send(player, "error.cosmetics-kit-changed");
+            return;
+        }
         if (!org.pvpcore.commands.kits.core.ActionGuards.allowed(
                 player, "perplayerkit.kit", LocationFeature.KITS)) return;
         ItemStack target = session.target();
@@ -117,7 +121,10 @@ public final class BannerPatternPickerPage extends GuiScreen {
                 BannerDesign updated = withLayer(design, layerIndex,
                         new BannerDesign.Layer(selectedDye, pattern), max);
                 if (updated == null) return; // configured/hard cap reached: no write
-                BannerDesignerPage.open(gui, p, session, kitSlot, updated);
+                // Replacing keeps that layer selected; an append selects the new last layer.
+                int resume = layerIndex >= 0 ? layerIndex : updated.size() - 1;
+                BannerDesignerPage.open(gui, p, session, kitSlot, updated,
+                        BannerDesignerPage.resumeLayerIndex(updated, resume));
             }, player), slot % GuiLayouts.COLUMNS, slot / GuiLayouts.COLUMNS);
             slot++;
         }
@@ -140,10 +147,11 @@ public final class BannerPatternPickerPage extends GuiScreen {
 
     @Override
     protected void renderChrome(StaticPane chrome) {
-        // Back returns to the designer with the in-progress design intact.
+        // Back returns to the designer with the in-progress design and layer selection intact.
         chrome.addItem(wrap(GuiTheme.back(), (p, e) -> {
             SoundManager.playClick(p);
-            BannerDesignerPage.open(gui, p, session, kitSlot, design);
+            BannerDesignerPage.open(gui, p, session, kitSlot, design,
+                    BannerDesignerPage.resumeLayerIndex(design, layerIndex));
         }, player), GuiLayouts.BANNER_BACK_SLOT % GuiLayouts.COLUMNS,
                 GuiLayouts.BANNER_BACK_SLOT / GuiLayouts.COLUMNS);
     }

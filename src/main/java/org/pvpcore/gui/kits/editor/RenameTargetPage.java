@@ -41,6 +41,10 @@ public final class RenameTargetPage extends GuiScreen {
     public static void open(GUI gui, Player player, CustomizeSession session, int kitSlot) {
         if (session == null || gui == null || player == null) return;
         if (gui.kits() == null) return;
+        if (gui.isCustomizeStale(player.getUniqueId())) {
+            gui.kits().lang().send(player, "error.cosmetics-kit-changed");
+            return;
+        }
         if (!org.pvpcore.commands.kits.core.ActionGuards.allowed(player, "perplayerkit.kit", LocationFeature.KITS)) return;
         CustomizeRules rules = CustomizeRules.parse(gui.kits().config().getConfigurationSection("customize"));
         if (!rules.enabled()) {
@@ -82,7 +86,7 @@ public final class RenameTargetPage extends GuiScreen {
                 if (empty) return;
                 SoundManager.playClick(p);
                 session.selectTarget(targetSlot);
-                UUID opId = gui.setPendingCustomize(p.getUniqueId(), session);
+                UUID opId = gui.holdPendingCustomize(p.getUniqueId(), session);
                 CustomizeRules rules = CustomizeRules.parse(gui.kits().config().getConfigurationSection("customize"));
                 CosmeticValidator validator = new CosmeticValidator(rules);
                 CosmeticApplier applier = new CosmeticApplier(rules, validator);

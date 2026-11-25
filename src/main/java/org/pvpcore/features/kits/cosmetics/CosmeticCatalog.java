@@ -147,14 +147,78 @@ public final class CosmeticCatalog {
     }
 
     private static ItemStack templateIcon(NamespacedKey key) {
-        Material template = item(key.getNamespace(), key.getKey() + "_smithing_template");
-        if (template == null) template = item(key.getNamespace(), key.getKey() + "_smithery_template");
-        return new ItemStack(template == null ? Material.PAPER : template);
+        return new ItemStack(vanillaTemplateMaterial(key));
     }
 
     private static ItemStack materialIcon(NamespacedKey key) {
-        Material material = item(key.getNamespace(), key.getKey());
-        return new ItemStack(material == null ? Material.PAPER : material);
+        return new ItemStack(vanillaTrimMaterial(key));
+    }
+
+    /**
+     * Vanilla trim-material registry paths are not Bukkit material names:
+     * {@code minecraft:iron} must render as {@code IRON_INGOT}, for example.
+     * Only the {@code minecraft} namespace uses the explicit, compile-checked
+     * mapping; other namespaces keep the best-effort
+     * {@link Material#matchMaterial(String)} lookup. {@link Material#PAPER} is
+     * the deliberate "no known icon" placeholder, not an entry's real item.
+     */
+    static Material vanillaTrimMaterial(NamespacedKey key) {
+        Material material = null;
+        if ("minecraft".equals(key.getNamespace())) {
+            material = switch (key.getKey()) {
+                case "iron" -> Material.IRON_INGOT;
+                case "gold" -> Material.GOLD_INGOT;
+                case "copper" -> Material.COPPER_INGOT;
+                case "netherite" -> Material.NETHERITE_INGOT;
+                case "lapis" -> Material.LAPIS_LAZULI;
+                case "amethyst" -> Material.AMETHYST_SHARD;
+                case "diamond" -> Material.DIAMOND;
+                case "emerald" -> Material.EMERALD;
+                case "quartz" -> Material.QUARTZ;
+                case "redstone" -> Material.REDSTONE;
+                case "resin" -> Material.RESIN_BRICK;
+                default -> null;
+            };
+        }
+        if (material == null) material = item(key.getNamespace(), key.getKey());
+        return material == null ? Material.PAPER : material;
+    }
+
+    /**
+     * Vanilla trim-pattern registry paths are not Bukkit material names; each of
+     * the 18 vanilla patterns maps to its compile-checked smithing-template item.
+     * The old {@code _smithing_template} / {@code _smithery_template} guesses are
+     * removed because neither name exists as a Bukkit material. Other namespaces
+     * keep the best-effort {@link Material#matchMaterial(String)} lookup, and
+     * {@link Material#PAPER} remains the "no known icon" placeholder.
+     */
+    static Material vanillaTemplateMaterial(NamespacedKey key) {
+        Material template = null;
+        if ("minecraft".equals(key.getNamespace())) {
+            template = switch (key.getKey()) {
+                case "bolt" -> Material.BOLT_ARMOR_TRIM_SMITHING_TEMPLATE;
+                case "coast" -> Material.COAST_ARMOR_TRIM_SMITHING_TEMPLATE;
+                case "dune" -> Material.DUNE_ARMOR_TRIM_SMITHING_TEMPLATE;
+                case "eye" -> Material.EYE_ARMOR_TRIM_SMITHING_TEMPLATE;
+                case "flow" -> Material.FLOW_ARMOR_TRIM_SMITHING_TEMPLATE;
+                case "host" -> Material.HOST_ARMOR_TRIM_SMITHING_TEMPLATE;
+                case "raiser" -> Material.RAISER_ARMOR_TRIM_SMITHING_TEMPLATE;
+                case "rib" -> Material.RIB_ARMOR_TRIM_SMITHING_TEMPLATE;
+                case "sentry" -> Material.SENTRY_ARMOR_TRIM_SMITHING_TEMPLATE;
+                case "shaper" -> Material.SHAPER_ARMOR_TRIM_SMITHING_TEMPLATE;
+                case "silence" -> Material.SILENCE_ARMOR_TRIM_SMITHING_TEMPLATE;
+                case "snout" -> Material.SNOUT_ARMOR_TRIM_SMITHING_TEMPLATE;
+                case "spire" -> Material.SPIRE_ARMOR_TRIM_SMITHING_TEMPLATE;
+                case "tide" -> Material.TIDE_ARMOR_TRIM_SMITHING_TEMPLATE;
+                case "vex" -> Material.VEX_ARMOR_TRIM_SMITHING_TEMPLATE;
+                case "ward" -> Material.WARD_ARMOR_TRIM_SMITHING_TEMPLATE;
+                case "wayfinder" -> Material.WAYFINDER_ARMOR_TRIM_SMITHING_TEMPLATE;
+                case "wild" -> Material.WILD_ARMOR_TRIM_SMITHING_TEMPLATE;
+                default -> null;
+            };
+        }
+        if (template == null) template = item(key.getNamespace(), key.getKey());
+        return template == null ? Material.PAPER : template;
     }
 
     private static Material item(String namespace, String path) {

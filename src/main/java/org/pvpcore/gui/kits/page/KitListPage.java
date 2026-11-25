@@ -60,10 +60,26 @@ public final class KitListPage extends GuiScreen {
         return Math.max(0, (slot - 1) / GuiLayouts.DASH_SLOTS_PER_PAGE);
     }
 
+    /**
+     * Inclusive 1-based slot range painted on one dashboard page. Immutable by virtue
+     * of being a record, and package-private so the range can be tested without a server.
+     * The page is clamped to the same valid range as the pager; {@code maxKits} is
+     * expected to arrive already clamped to 1..99 by KitsContext.maxKits().
+     */
+    record VisibleSlots(int first, int last) {
+    }
+
+    static VisibleSlots visibleSlots(int page, int maxKits) {
+        int perPage = GuiLayouts.DASH_SLOTS_PER_PAGE;
+        int maxPages = Math.max(1, (maxKits + perPage - 1) / perPage);
+        int clampedPage = Math.max(0, Math.min(page, maxPages - 1));
+        int first = clampedPage * perPage + 1;
+        int last = Math.min(maxKits, first + perPage - 1);
+        return new VisibleSlots(first, last);
+    }
+
     private GuiPager pager() {
-        int maxKits = Math.max(1, kits().config().getInt("kits.max-slots", 9));
-        maxKits = Math.min(54, maxKits);
-        return GuiPager.of(page, maxKits, GuiLayouts.DASH_SLOTS_PER_PAGE);
+        return GuiPager.of(page, kits() == null ? 9 : kits().maxKits(), GuiLayouts.DASH_SLOTS_PER_PAGE);
     }
 
     @Override
@@ -77,10 +93,9 @@ public final class KitListPage extends GuiScreen {
         GuiPager pager = pager();
         page = pager.currentPage();
 
-        int maxKits = Math.max(1, Math.min(54,
-                kits().config().getInt("kits.max-slots", 9)));
-        int first = pager.from() + 1;
-        int last = Math.min(maxKits, first + GuiLayouts.DASH_SLOTS_PER_PAGE - 1);
+        VisibleSlots visible = visibleSlots(page, kits() == null ? 9 : kits().maxKits());
+        int first = visible.first();
+        int last = visible.last();
         int shown = last - first + 1;
         int offset = (GuiLayouts.COLUMNS - shown) / 2; // a short last page stays centered
         KitManager kitsMgr = kits().kitManager();

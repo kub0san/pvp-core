@@ -122,12 +122,15 @@ public class GUI implements GuiSession {
         private void markStale() { stale = true; }
     }
 
-    /** Stores a session for an async prompt and returns the id the callback must present. */
+    /**
+     * Stores a session for an async prompt and returns the id the callback must present.
+     *
+     * <p>Starting a chat/async prompt is not a fresh editor entry: this deliberately keeps any
+     * reload stale marker. Only {@code CustomizePage.open} clears stale state; a pending
+     * operation must not.</p>
+     */
     public UUID setPendingCustomize(UUID viewer, CustomizeSession session) {
-        UUID operationId = holdPendingCustomize(viewer, session);
-        // A new rename/chat flow is a fresh session: it clears a reload marker left by an older one.
-        staleCustomize.remove(viewer);
-        return operationId;
+        return holdPendingCustomize(viewer, session);
     }
 
     /**

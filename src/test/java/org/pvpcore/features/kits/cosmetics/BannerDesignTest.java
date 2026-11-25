@@ -97,4 +97,26 @@ class BannerDesignTest {
         assertThrows(IllegalArgumentException.class,
                 () -> BannerDesign.blank().applyTo(new ItemStack(Material.DIAMOND_CHESTPLATE)));
     }
+
+    @Test
+    void fromReadsBaseDyeFromBannerMaterial() {
+        BannerDesign design = BannerDesign.from(new ItemStack(Material.RED_BANNER));
+        assertEquals(DyeColor.RED, design.baseColor());
+    }
+
+    @Test
+    void fromStillReadsExplicitShieldBase() {
+        ItemStack shield = new ItemStack(Material.SHIELD);
+        ShieldMeta meta = (ShieldMeta) shield.getItemMeta();
+        meta.setBaseColor(DyeColor.BLUE);
+        shield.setItemMeta(meta);
+
+        assertEquals(DyeColor.BLUE, BannerDesign.from(shield).baseColor());
+    }
+
+    @Test
+    void fromRejectsUnrelatedMaterial() {
+        assertThrows(IllegalArgumentException.class,
+                () -> BannerDesign.from(new ItemStack(Material.DIAMOND_CHESTPLATE)));
+    }
 }

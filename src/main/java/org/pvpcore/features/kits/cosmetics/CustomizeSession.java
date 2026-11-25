@@ -88,6 +88,22 @@ public final class CustomizeSession {
         return true;
     }
 
+    /**
+     * Rebases this session onto the live cache after an unconfirmed write. The returned session
+     * snapshots {@code current} again, so a retry is not rejected as KIT_CHANGED, and carries no
+     * stale staged flags; a still-valid target selection is preserved. A null read (no manager
+     * or no cached kit) has nothing to rebase onto, so the taken session is returned unchanged
+     * and its staged edits survive.
+     */
+    public CustomizeSession rebaseFrom(ItemStack[] current) {
+        if (current == null) return this;
+        CustomizeSession rebased = new CustomizeSession(current);
+        if (targetSlot >= 0 && targetSlot < rebased.working.length) {
+            rebased.targetSlot = targetSlot;
+        }
+        return rebased;
+    }
+
     private void requireTarget() {
         if (targetSlot < 0 || targetSlot >= working.length) {
             throw new IllegalStateException("No kit target selected");

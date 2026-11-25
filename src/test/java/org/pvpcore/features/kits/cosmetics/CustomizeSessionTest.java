@@ -10,7 +10,9 @@ import org.mockbukkit.mockbukkit.MockBukkit;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class CustomizeSessionTest {
@@ -149,5 +151,46 @@ class CustomizeSessionTest {
         assertEquals(0, saved.length);
         assertTrue(session.matchesCurrent(saved));
         assertNull(session.working()[0]);
+    }
+
+    @Test
+    void rebaseFromCachedContentsMatchesCurrentAndDropsStagedFlags() {
+        CustomizeSession staged = new CustomizeSession(source());
+        staged.selectTarget(36);
+        staged.stageTarget(new ItemStack(Material.NETHERITE_CHESTPLATE));
+        assertTrue(staged.isStaged(36));
+
+        ItemStack[] cached = staged.working(); // eager cache mutation before the write resolves
+        CustomizeSession rebased = staged.rebaseFrom(cached);
+
+        assertNotSame(staged, rebased);
+        assertTrue(rebased.matchesCurrent(cached));
+        assertEquals(36, rebased.targetSlot());
+        assertEquals(Material.NETHERITE_CHESTPLATE, rebased.target().getType());
+        assertFalse(rebased.isStaged(36));
+    }
+
+    @Test
+    void rebaseFromOutOfRangeTargetIsNotPreserved() {
+        ItemStack[] longKit = new ItemStack[60];
+        longKit[50] = new ItemStack(Material.SHIELD);
+        CustomizeSession staged = new CustomizeSession(longKit);
+        staged.selectTarget(50);
+
+        CustomizeSession rebased = staged.rebaseFrom(source()); // 41 slots after normalization
+
+        assertEquals(-1, rebased.targetSlot());
+        assertTrue(rebased.matchesCurrent(source()));
+    }
+
+    @Test
+    void rebaseFromNullCacheKeepsTakenSession() {
+        CustomizeSession staged = new CustomizeSession(source());
+        staged.selectTarget(36);
+        staged.stageTarget(new ItemStack(Material.NETHERITE_CHESTPLATE));
+
+        assertSame(staged, staged.rebaseFrom(null));
+        assertEquals(Material.NETHERITE_CHESTPLATE, staged.target().getType());
+        assertTrue(staged.isStaged(36));
     }
 }

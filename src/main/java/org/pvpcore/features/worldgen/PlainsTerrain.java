@@ -137,7 +137,7 @@ final class PlainsTerrain implements TerrainProfile {
     @Override
     public void generateSurface(ChunkData data, int lx, int lz, int surface,
                                 long seed, int worldX, int worldZ,
-                                WorldGenSettings worldSettings, int minY, int maxY) {
+                                WorldGenSettings.Snapshot snapshot, int minY, int maxY) {
         SurfaceMaterials.applyVanilla(data, lx, lz, surface, worldX, worldZ, seed);
     }
 
@@ -146,19 +146,19 @@ final class PlainsTerrain implements TerrainProfile {
     // =========================================================================
 
     @Override
-    public void decorate(WorldGenSettings settings, WorldInfo info, Random random,
+    public void decorate(WorldGenSettings.Snapshot snapshot, WorldInfo info, Random random,
                          int chunkX, int chunkZ, LimitedRegion region) {
         int baseX = chunkX << 4;
         int baseZ = chunkZ << 4;
 
         if (random.nextDouble() < OAK_CHANCE_PER_CHUNK) {
-            placeVanillaOak(settings, info, random, region,
+            placeVanillaOak(snapshot, info, random, region,
                     baseX + random.nextInt(16), baseZ + random.nextInt(16));
         }
 
-        placePumpkinPatch(settings, info, random, region, baseX, baseZ);
-        placeGrassPatches(settings, info, random, region, baseX, baseZ);
-        placeFlowerPatch(settings, info, random, region, baseX, baseZ);
+        placePumpkinPatch(snapshot, info, random, region, baseX, baseZ);
+        placeGrassPatches(snapshot, info, random, region, baseX, baseZ);
+        placeFlowerPatch(snapshot, info, random, region, baseX, baseZ);
     }
 
     // =========================================================================
@@ -235,11 +235,11 @@ final class PlainsTerrain implements TerrainProfile {
     // Decoration helpers
     // =========================================================================
 
-    private boolean placeVanillaOak(WorldGenSettings settings, WorldInfo info, Random random,
+    private boolean placeVanillaOak(WorldGenSettings.Snapshot snapshot, WorldInfo info, Random random,
                                     LimitedRegion region, int x, int z) {
         int minY = info.getMinHeight();
         int maxY = info.getMaxHeight();
-        int surface = settings.surfaceAt(ArenaBiome.PLAINS, info.getSeed(), x, z, minY, maxY);
+        int surface = WorldGenSettings.surfaceAt(snapshot, ArenaBiome.PLAINS, info.getSeed(), x, z, minY, maxY);
         if (surface + 14 >= maxY || surface - 1 < minY
                 || !region.isInRegion(x, surface + 1, z)
                 || region.getType(x, surface, z) != Material.GRASS_BLOCK
@@ -249,7 +249,7 @@ final class PlainsTerrain implements TerrainProfile {
 
         for (int dx = -2; dx <= 2; dx++) {
             for (int dz = -2; dz <= 2; dz++) {
-                int neighbourY = settings.surfaceAt(ArenaBiome.PLAINS, info.getSeed(), x + dx, z + dz,
+                int neighbourY = WorldGenSettings.surfaceAt(snapshot, ArenaBiome.PLAINS, info.getSeed(), x + dx, z + dz,
                         minY, maxY);
                 if (Math.abs(neighbourY - surface) > 5) {
                     return false;
@@ -261,7 +261,7 @@ final class PlainsTerrain implements TerrainProfile {
         return region.generateTree(new Location(null, x, surface + 1, z), random, treeType);
     }
 
-    private void placeGrassPatches(WorldGenSettings settings, WorldInfo info, Random random,
+    private void placeGrassPatches(WorldGenSettings.Snapshot snapshot, WorldInfo info, Random random,
                                    LimitedRegion region, int baseX, int baseZ) {
         long seed = info.getSeed();
         for (int patch = 0; patch < GRASS_PATCHES_PER_CHUNK; patch++) {
@@ -277,13 +277,13 @@ final class PlainsTerrain implements TerrainProfile {
                 double density = 0.65 + 0.7 * NoiseHelper.valueNoise(
                         x * 0.075, z * 0.075, seed + 0x6A55L);
                 if (random.nextDouble() < chance * density) {
-                    placeGrass(settings, info, random, region, x, z);
+                    placeGrass(snapshot, info, random, region, x, z);
                 }
             }
         }
     }
 
-    private void placeFlowerPatch(WorldGenSettings settings, WorldInfo info, Random random,
+    private void placeFlowerPatch(WorldGenSettings.Snapshot snapshot, WorldInfo info, Random random,
                                   LimitedRegion region, int baseX, int baseZ) {
         if (random.nextDouble() >= FLOWER_PATCH_CHANCE_PER_CHUNK) {
             return;
@@ -309,11 +309,11 @@ final class PlainsTerrain implements TerrainProfile {
             }
             double mix = NoiseHelper.fbm(x * 0.11, z * 0.11, seed + 0x5EEDL, 1);
             Material flower = mix > FLOWER_MIX_THRESHOLD ? secondary : primary;
-            placeGroundPlant(settings, info, region, x, z, flower);
+            placeGroundPlant(snapshot, info, region, x, z, flower);
         }
     }
 
-    private void placePumpkinPatch(WorldGenSettings settings, WorldInfo info, Random random,
+    private void placePumpkinPatch(WorldGenSettings.Snapshot snapshot, WorldInfo info, Random random,
                                    LimitedRegion region, int baseX, int baseZ) {
         if (random.nextDouble() >= PUMPKIN_PATCH_CHANCE_PER_CHUNK) {
             return;
@@ -330,7 +330,7 @@ final class PlainsTerrain implements TerrainProfile {
             if (random.nextDouble() >= chance) {
                 continue;
             }
-            int surface = settings.surfaceAt(ArenaBiome.PLAINS, info.getSeed(), x, z,
+            int surface = WorldGenSettings.surfaceAt(snapshot, ArenaBiome.PLAINS, info.getSeed(), x, z,
                     info.getMinHeight(), info.getMaxHeight());
             if (!region.isInRegion(x, surface + 1, z)
                     || region.getType(x, surface, z) != Material.GRASS_BLOCK
@@ -342,9 +342,9 @@ final class PlainsTerrain implements TerrainProfile {
         }
     }
 
-    private void placeGrass(WorldGenSettings settings, WorldInfo info, Random random,
+    private void placeGrass(WorldGenSettings.Snapshot snapshot, WorldInfo info, Random random,
                             LimitedRegion region, int x, int z) {
-        int surface = settings.surfaceAt(ArenaBiome.PLAINS, info.getSeed(), x, z,
+        int surface = WorldGenSettings.surfaceAt(snapshot, ArenaBiome.PLAINS, info.getSeed(), x, z,
                 info.getMinHeight(), info.getMaxHeight());
         if (!region.isInRegion(x, surface + 1, z)
                 || region.getType(x, surface, z) != Material.GRASS_BLOCK
@@ -366,9 +366,9 @@ final class PlainsTerrain implements TerrainProfile {
         }
     }
 
-    private void placeGroundPlant(WorldGenSettings settings, WorldInfo info, LimitedRegion region,
+    private void placeGroundPlant(WorldGenSettings.Snapshot snapshot, WorldInfo info, LimitedRegion region,
                                   int x, int z, Material plant) {
-        int surface = settings.surfaceAt(ArenaBiome.PLAINS, info.getSeed(), x, z,
+        int surface = WorldGenSettings.surfaceAt(snapshot, ArenaBiome.PLAINS, info.getSeed(), x, z,
                 info.getMinHeight(), info.getMaxHeight());
         if (region.isInRegion(x, surface + 1, z)
                 && region.getType(x, surface, z) == Material.GRASS_BLOCK

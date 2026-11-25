@@ -53,7 +53,8 @@ final class ChunkGenerator extends org.bukkit.generator.ChunkGenerator {
     @Override
     public void generateNoise(@NotNull WorldInfo info, @NotNull Random random,
                               int chunkX, int chunkZ, @NotNull ChunkData data) {
-        if (!settings.insideRadius(chunkX, chunkZ)) {
+        WorldGenSettings.Snapshot snapshot = settings.snapshot();
+        if (!settings.insideRadius(snapshot, chunkX, chunkZ)) {
             return;
         }
 
@@ -61,7 +62,7 @@ final class ChunkGenerator extends org.bukkit.generator.ChunkGenerator {
         int maxY = info.getMaxHeight();
         long seed = info.getSeed();
 
-        generateTerrainColumns(data, chunkX, chunkZ, seed, minY, maxY);
+        generateTerrainColumns(data, chunkX, chunkZ, seed, minY, maxY, snapshot);
         applyBedrock(data, chunkX, chunkZ, seed, minY, maxY);
         applyDeepslate(data, chunkX, chunkZ, seed, minY, maxY);
     }
@@ -77,18 +78,20 @@ final class ChunkGenerator extends org.bukkit.generator.ChunkGenerator {
     }
 
     private void generateTerrainColumns(ChunkData data, int chunkX, int chunkZ,
-                                        long seed, int minY, int maxY) {
+                                        long seed, int minY, int maxY,
+                                        WorldGenSettings.Snapshot snapshot) {
         for (int lx = 0; lx < 16; lx++) {
             int worldX = (chunkX << 4) + lx;
             for (int lz = 0; lz < 16; lz++) {
                 int worldZ = (chunkZ << 4) + lz;
-                int surface = settings.surfaceAt(biome, seed, worldX, worldZ, minY, maxY);
+                int surface = WorldGenSettings.surfaceAt(snapshot, biome, seed,
+                        worldX, worldZ, minY, maxY);
 
                 // Every biome starts with the same solid stone column. Its profile replaces
                 // only the surface layers, so underground generation cannot diverge by biome.
                 data.setRegion(lx, minY + 2, lz, lx + 1, surface + 1, lz + 1, Material.STONE);
                 biome.terrain().generateSurface(data, lx, lz, surface, seed, worldX, worldZ,
-                        settings, minY, maxY);
+                        snapshot, minY, maxY);
             }
         }
     }
