@@ -210,7 +210,8 @@ final class KitRecordStore {
 
     void loadKitEntryFromDB(String id, int size) {
         long captured = generation(id);
-        String data = storageManager().getKitDataByID(id);
+        // Honor pending failed writes so a stale DB row cannot clobber recovered data.
+        String data = readStoredData(id);
         if (!isCurrent(id, captured)) return; // a newer write won; discard this snapshot
         if (!isStoredData(data)) return;
         try {
