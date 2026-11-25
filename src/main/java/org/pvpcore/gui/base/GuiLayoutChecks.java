@@ -29,6 +29,12 @@ public final class GuiLayoutChecks {
     private GuiLayoutChecks() {
     }
 
+    private static void checkCustomizeRows() {
+        if (GuiLayouts.CUSTOMIZE_PICKER_LAST >= GuiLayouts.FOOTER_START) {
+            throw new IllegalStateException("CUSTOMIZE_PICKER_LAST out of range");
+        }
+    }
+
     /** Called once from {@code PvPCorePlugin#onEnable}. */
     public static void verify() {
         checkEditorRows();
@@ -37,6 +43,7 @@ public final class GuiLayoutChecks {
         checkRowCounts();
         checkSettingsCapacity();
         checkDockRows();
+        checkCustomizeRows();
     }
 
     // ------------------------------------------------------------------ screens

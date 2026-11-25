@@ -78,6 +78,35 @@ public final class GuiLayouts {
     // ---- Total chest rows per screen type ----
     public static final int ROWS_CONFIRM = 4;
     public static final int ROWS_EDITOR = 6;
+
+    // ---- Kit cosmetics customize screen ----
+    public static final int EDITOR_CUSTOMIZE_SLOT = 41;
+    public static final int CUSTOMIZE_TARGET_FIRST = 0;
+    public static final int CUSTOMIZE_PREVIEW_SLOT = 50;
+    public static final int CUSTOMIZE_BACK_SLOT = 45;
+    public static final int CUSTOMIZE_RESET_SLOT = 46;
+    public static final int CUSTOMIZE_REMOVE_SLOT = 47;
+    public static final int CUSTOMIZE_APPLY_SLOT = 53;
+    public static final int CUSTOMIZE_PICKER_FIRST = 9;
+    public static final int CUSTOMIZE_PICKER_LAST = 44;
+    public static final int RENAME_TARGET_FIRST = 0;
+    public static final int RENAME_TARGET_LAST = 40;
+    public static final int RENAME_BACK_SLOT = 53;
+
+    // ---- Banner designer ----
+    public static final int BANNER_TEMPLATE_SLOT = 0;
+    public static final int BANNER_PREVIEW_SLOT = 8;
+    public static final int BANNER_BASE_SLOT = 9;
+    public static final int BANNER_LAYERS_FIRST = 10;
+    public static final int BANNER_LAYERS_LAST = 36;
+    public static final int BANNER_ADD_SLOT = 37;
+    public static final int BANNER_REMOVE_SLOT = 38;
+    public static final int BANNER_UP_SLOT = 39;
+    public static final int BANNER_DOWN_SLOT = 40;
+    public static final int BANNER_BLANK_SLOT = 43;
+    public static final int BANNER_REVERT_SLOT = 44;
+    public static final int BANNER_BACK_SLOT = 45;
+    public static final int BANNER_APPLY_SLOT = 53;
     public static final int ROWS_PREVIEW = 5;
 
     // ---- Public kit preview (5 rows, full canvas) ----

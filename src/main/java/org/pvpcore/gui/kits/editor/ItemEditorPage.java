@@ -68,6 +68,16 @@ public final class ItemEditorPage extends GuiScreen {
         spec.button(GuiLayouts.EDITOR_IMPORT_SLOT, EditorSpec.importButton(kits, "Import", "Copy what you carry",
                 p -> p.getInventory().getContents(), GuiLayouts.KIT_CONTENT_START, kitLength()));
         spec.button(GuiLayouts.EDITOR_CLEAR_SLOT, EditorSpec.clearButton(GuiLayouts.KIT_CONTENT_START, kitLength()));
+        if (org.pvpcore.config.kits.CustomizeRules.parse(
+                kits.config().getConfigurationSection("customize")).enabled()) {
+            spec.button(GuiLayouts.EDITOR_CUSTOMIZE_SLOT, new EditorSpec.Button(
+                    GuiTheme.named(Material.ARMOR_STAND, GuiTheme.AQUA + "<bold>", "Customize", GuiTheme.dim("Trims, banners, names"), GuiTheme.hint("Click", "open")),
+                    (p, e) -> {
+                        SoundManager.playClick(p);
+                        gui.flushOpenEditor(p);
+                        CustomizePage.open(gui, p, slot, new org.pvpcore.features.kits.cosmetics.CustomizeSession(gui.kits().kitManager().getPlayerKit(p.getUniqueId(), slot)));
+                    }));
+        }
         spec.button(GuiLayouts.EDITOR_BACK_SLOT, EditorSpec.backButton("Saved automatically", p -> {
             gui.flushOpenEditor(p);
             KitListPage.open(gui, p, KitListPage.pageOfSlot(p, false, slot));

@@ -13,6 +13,8 @@ import org.pvpcore.listeners.kits.JoinListener;
 import org.pvpcore.listeners.kits.KitMenuCloseListener;
 import org.pvpcore.listeners.kits.OldDeathDropListener;
 import org.pvpcore.listeners.kits.QuitListener;
+import org.pvpcore.gui.base.GuiChatPrompt;
+import org.pvpcore.gui.kits.GUI;
 import org.pvpcore.storage.kits.StorageConnectionException;
 import org.pvpcore.storage.kits.StorageManager;
 import org.pvpcore.util.kits.BackupManager;
@@ -204,6 +206,11 @@ final class KitsLifecycle {
                 Kits.configFile = loaded.file();
                 ctx.setConfig(loaded.config());
                 ctx.setConfigFile(loaded.file());
+
+                // Staged cosmetic edits and chat prompts from the old config must not write
+                // through a reloaded manager. Reopening the editor starts a fresh session.
+                GUI.getOrCreate(Kits.plugin, ctx).invalidateCustomizeSessions();
+                GuiChatPrompt.clear();
 
                 // Singletons/services that snapshot configuration in their constructors.
                 KitSlots.init(Kits.plugin, ctx.config());

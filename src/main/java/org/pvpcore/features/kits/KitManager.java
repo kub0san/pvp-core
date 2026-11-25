@@ -220,6 +220,27 @@ public class KitManager {
         return true;
     }
 
+    /**
+     * Explicit async save for cosmetic Apply. Mirrors the silent synchronous path's validation,
+     * filtering, preparation and caching, but hands back the queued write instead of sending chat.
+     * Existing savekit/saveEC callers keep their original behaviour.
+     */
+    public KitSaveResult savePersonalKitAsync(UUID uuid, int slot, ItemStack[] contents) {
+        if (uuid == null || slot < 1 || slot > 99 || sessions.isLoading(uuid)) return KitSaveResult.rejected();
+
+        if (itemFilter().filtersSaves()) {
+            if (!itemFilter().isReady()) return KitSaveResult.rejected();
+            contents = itemFilter().filterKit(contents, null);
+            if (contents == null) return KitSaveResult.rejected();
+        }
+        ItemStack[] prepared = KitContents.prepare(contents, false);
+        if (prepared == null) return KitSaveResult.rejected();
+
+        String id = IDUtil.getPlayerKitId(uuid, slot);
+        cacheKit(id, prepared);
+        return new KitSaveResult(true, store.saveKitToDB(id));
+    }
+
     public boolean savePublicKit(Player player, String id, ItemStack[] contents) {
         if (player == null) return false;
         if (!savePublicKit(id, contents)) {

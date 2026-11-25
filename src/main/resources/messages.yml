@@ -187,6 +187,14 @@ pvpcore: # Renamed from 'kits'
     kitdata-in-progress: "<red>Another kit data export or import is already running, wait for it to finish</red>"
     kitdata-export-failed: "<red>Export failed, check the console for details</red>"
     autosetup-reset-console-only: "<red>Resetting the kit room can only be done from the server console.</red>"
+    cosmetics-disabled: "<red>Kit customizing is disabled on this server.</red>"
+    cosmetics-not-armor: "<red>That item is not armor and cannot have a trim.</red>"
+    cosmetics-not-shield: "<red>Put a shield in your kit's offhand slot first.</red>"
+    cosmetics-name-invalid: "<red>That name is invalid or too long.</red>"
+    cosmetics-name-tag-blocked: "<red>That name uses formatting tags that are not allowed here.</red>"
+    cosmetics-banner-locked: "<red>This shield has banner layers that cannot be read; editing is locked.</red>"
+    cosmetics-kit-changed: "<red>Your kit changed while the customize screen was open. Reopen it to try again.</red>"
+    cosmetics-save-failed: "<red>Your kit could not be saved. No changes were applied.</red>"
 
   success:
     ec-deleted: "<green>Enderchest kit {slot} deleted.</green>"
@@ -273,6 +281,8 @@ pvpcore: # Renamed from 'kits'
     autosetup-reset-confirm: "<yellow>This will overwrite every enabled kit room page and public kit with the bundled defaults. Player kits are not affected. Run /perplayerkit autosetup reset confirm to proceed.</yellow>"
     autosetup-public-kits: "<gray>Public kits filled: {kits}</gray>"
     autosetup-next-steps: "<gray>Open /kit to browse the kit room, or /publickit to see the server kits.</gray>"
+    cosmetics-applied: "<green>Your kit cosmetics were applied.</green>"
+    cosmetics-save-queued: "<gray>Saving your kit cosmetics...</gray>"
 
   command:
     perplayerkit-usage-location: "<gray>/perplayerkit location [feature] <dark_gray>Check world and region rules here."
@@ -345,6 +355,9 @@ pvpcore: # Renamed from 'kits'
     view-public-kit-title: "Viewing Public Kit: {id}"
     enderchest-view-title: "View Only Enderchest"
     regear-shulker-title: "Regear Shulker"
+    customize-title: "<dark_aqua>Customize Kit: {slot}</dark_aqua>"
+    banner-designer-title: "<dark_aqua>Shield Banner Designer</dark_aqua>"
+    rename-target-title: "<dark_aqua>Select an item to rename</dark_aqua>"
 
     kit-slot-name: "<dark_aqua>Kit {slot}</dark_aqua>"
     enderchest-slot-name: "<dark_aqua>Enderchest {slot}</dark_aqua>"

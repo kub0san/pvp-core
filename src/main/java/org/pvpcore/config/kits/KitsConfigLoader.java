@@ -38,6 +38,8 @@ public class KitsConfigLoader {
             ItemFilterRules.parse(config);
             org.pvpcore.util.kits.LocationRules.parse(config);
             org.pvpcore.util.kits.RekitKitResolver.validate(config);
+            CustomizeRules.parse(config.getConfigurationSection("customize"),
+                    warning -> plugin.getLogger().warning(warning));
             try (InputStream in = plugin.getResource("kits/config.yml")) {
                 if (in == null) throw new java.io.IOException("Bundled kits/config.yml is missing");
                 YamlConfiguration defaults = new YamlConfiguration();
