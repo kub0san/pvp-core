@@ -57,7 +57,7 @@ public final class CombatTagFeature implements PvPCoreModule {
 
     @Override
     public Set<String> dependsOn() {
-        return Set.of("kits");
+        return Set.of();
     }
 
     @Override
