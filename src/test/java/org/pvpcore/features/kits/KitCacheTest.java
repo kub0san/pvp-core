@@ -64,4 +64,24 @@ class KitCacheTest {
         writer.join(10_000);
         assertNull(failure.get(), "writer thread failed: " + failure.get());
     }
+
+    /** Regression for KIT2-2: reload must evict cached public-kit contents, not just the list. */
+    @Test
+    void clearPublicKitsRemovesCachedContents() {
+        KitCache cache = new KitCache();
+        org.bukkit.Material icon = org.bukkit.Material.DIAMOND_SWORD;
+        cache.registerPublicKit(new PublicKit("alpha", "Alpha", icon));
+        cache.cacheKit(org.pvpcore.util.kits.IDUtil.getPublicKitId("alpha"),
+                new org.bukkit.inventory.ItemStack[]{new org.bukkit.inventory.ItemStack(icon)});
+
+        org.junit.jupiter.api.Assertions.assertTrue(
+                cache.hasPublicKit("alpha"), "public kit contents should be cached before clear");
+
+        cache.clearPublicKits();
+
+        org.junit.jupiter.api.Assertions.assertTrue(cache.getPublicKitList().isEmpty(),
+                "public kit list should be empty after clear");
+        org.junit.jupiter.api.Assertions.assertFalse(cache.hasPublicKit("alpha"),
+                "cached public-kit contents should be evicted on clear");
+    }
 }
