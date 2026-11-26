@@ -4,10 +4,7 @@ import org.bukkit.configuration.ConfigurationSection;
 import org.pvpcore.PvPCorePlugin;
 
 import java.util.EnumMap;
-import java.util.HashSet;
-import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 /** Immutable-per-reload worldgen settings, with independent terrain values for each biome. */
 final class WorldGenSettings {
@@ -169,11 +166,15 @@ final class WorldGenSettings {
 
     /** Height of the top surface block, shared by the generator and its decorator. */
     int surfaceAt(ArenaBiome biome, long seed, int x, int z, int minY, int maxY) {
+        ArenaBiome effective = (biome == null) ? ArenaBiome.PLAINS : biome;
         Map<ArenaBiome, Terrain> snapshot = terrain;
-        Terrain cfg = snapshot.get(biome);
-        if (cfg == null) cfg = DEFAULTS.get(biome);
+        Terrain cfg = snapshot.get(effective);
+        if (cfg == null) cfg = DEFAULTS.get(effective);
+        if (cfg == null) {
+            cfg = DEFAULTS.isEmpty() ? null : DEFAULTS.values().iterator().next();
+        }
         if (cfg == null) throw new IllegalStateException("No terrain settings for biome " + biome);
-        return biome.terrain().surfaceY(cfg, seed, x, z, minY, maxY);
+        return effective.terrain().surfaceY(cfg, seed, x, z, minY, maxY);
     }
 
     /** The current terrain settings for one biome. */

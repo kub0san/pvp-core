@@ -1,7 +1,11 @@
 package org.pvpcore.features.kits;
 
 import org.bukkit.Material;
+import org.bukkit.inventory.ItemStack;
 import org.junit.jupiter.api.Test;
+
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
@@ -69,19 +73,19 @@ class KitCacheTest {
     @Test
     void clearPublicKitsRemovesCachedContents() {
         KitCache cache = new KitCache();
-        org.bukkit.Material icon = org.bukkit.Material.DIAMOND_SWORD;
+        Material icon = Material.DIAMOND_SWORD;
         cache.registerPublicKit(new PublicKit("alpha", "Alpha", icon));
         cache.cacheKit(org.pvpcore.util.kits.IDUtil.getPublicKitId("alpha"),
-                new org.bukkit.inventory.ItemStack[]{new org.bukkit.inventory.ItemStack(icon)});
+                new ItemStack[]{new ItemStack(icon)});
 
-        org.junit.jupiter.api.Assertions.assertTrue(
+        assertTrue(
                 cache.hasPublicKit("alpha"), "public kit contents should be cached before clear");
 
         cache.clearPublicKits();
 
-        org.junit.jupiter.api.Assertions.assertTrue(cache.getPublicKitList().isEmpty(),
+        assertTrue(cache.getPublicKitList().isEmpty(),
                 "public kit list should be empty after clear");
-        org.junit.jupiter.api.Assertions.assertFalse(cache.hasPublicKit("alpha"),
+        assertFalse(cache.hasPublicKit("alpha"),
                 "cached public-kit contents should be evicted on clear");
     }
 }

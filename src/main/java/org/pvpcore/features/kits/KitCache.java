@@ -86,8 +86,10 @@ final class KitCache {
      * so kits removed from config do not linger in the contents map.
      */
     void clearPublicKits() {
+        for (PublicKit kit : publicKits) {
+            kits.remove(IDUtil.getPublicKitId(kit.id));
+        }
         publicKits.clear();
-        kits.keySet().removeIf(id -> id.startsWith("public"));
     }
 
     boolean hasPublicKit(String id) {
