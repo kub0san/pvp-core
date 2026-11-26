@@ -236,9 +236,8 @@ public final class CustomizePage extends GuiScreen {
         return true;
     }
 
-    /** Placeholder: the compact enchantment screen replaces this in the next task. */
     private void openEnchantments(Player p) {
-        // The compact enchantment screen replaces this placeholder in the next task.
+        EnchantmentEditorPage.open(gui, p, session, slot, kitSlot);
     }
 
     /** Placeholder: the compact trim screen replaces this in a later task. */

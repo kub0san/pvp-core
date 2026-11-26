@@ -196,6 +196,7 @@ pvpcore: # Renamed from 'kits'
     cosmetics-kit-changed: "<red>Your kit changed while the customize screen was open. Reopen it to try again.</red>"
     cosmetics-save-failed: "<red>Your kit could not be saved. No changes were applied.</red>"
     cosmetics-save-unconfirmed: "<red>Save not confirmed - your changes are kept and will be retried.</red>"
+    enchant-invalid: "<red>That enchantment is not allowed on this item.</red>"
 
   success:
     ec-deleted: "<green>Enderchest kit {slot} deleted.</green>"
@@ -357,6 +358,10 @@ pvpcore: # Renamed from 'kits'
     enderchest-view-title: "View Only Enderchest"
     regear-shulker-title: "Regear Shulker"
     customize-title: "<dark_aqua>Customize Kit: {slot}</dark_aqua>"
+    enchant-title: "<dark_aqua>Enchant Item</dark_aqua>"
+    enchant-level: "<gray>Level <white>{level}</white> / {max}</gray>"
+    enchant-added: "<green>Enchantments updated.</green>"
+    enchant-removed: "<green>Enchantment removed.</green>"
     banner-designer-title: "<dark_aqua>Shield Banner Designer</dark_aqua>"
     rename-target-title: "<dark_aqua>Select an item to rename</dark_aqua>"
 

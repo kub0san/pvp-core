@@ -108,7 +108,8 @@ public class ItemFilter {
         return true; // why: survivor fallback remains fail-open when kits context/filter unavailable to preserve legacy behavior.
     }
 
-    private boolean allowed(ItemStack item) {
+    /** Whether one item passes the configured kit-room policy; exposed for staged cosmetic edits. */
+    public boolean allowed(ItemStack item) {
         if (!settings.enabled() || item == null || item.getType().isAir()) return true;
         if (settings.kitRoomOnly() && !whitelist.contains(item.getType().name())) return false;
         if (item.getAmount() < 1 || item.getAmount() > item.getMaxStackSize()) return false;
