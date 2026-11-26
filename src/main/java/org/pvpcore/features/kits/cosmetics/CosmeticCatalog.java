@@ -75,6 +75,34 @@ public final class CosmeticCatalog {
         return filter(banners, rules::allowsBannerPattern);
     }
 
+    /**
+     * Resolves the registry-backed pattern for a catalog key so a GUI selection can be handed to
+     * {@link CosmeticApplier#applyTrim}. Returns null when the registry is unavailable or the key
+     * is unknown; callers must fail closed rather than guess an object.
+     */
+    public static TrimPattern trimPattern(String key) {
+        return keyed(RegistryKey.TRIM_PATTERN, key);
+    }
+
+    /** Registry-backed material counterpart of {@link #trimPattern(String)}. */
+    public static TrimMaterial trimMaterial(String key) {
+        return keyed(RegistryKey.TRIM_MATERIAL, key);
+    }
+
+    private static <T extends Keyed> T keyed(RegistryKey<T> registryKey, String id) {
+        if (id == null || id.isBlank()) return null;
+        Registry<T> registry = registry(registryKey);
+        if (registry == null) return null;
+        for (T value : registry) {
+            try {
+                if (value.getKey() != null && id.equals(value.getKey().toString())) return value;
+            } catch (RuntimeException e) {
+                // One malformed registry entry must not hide the rest.
+            }
+        }
+        return null;
+    }
+
     private static List<Entry> filter(List<Entry> entries, Predicate<String> allowed) {
         return entries.stream().filter(entry -> allowed.test(entry.key())).toList();
     }

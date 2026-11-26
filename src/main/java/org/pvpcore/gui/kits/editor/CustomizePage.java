@@ -240,9 +240,9 @@ public final class CustomizePage extends GuiScreen {
         EnchantmentEditorPage.open(gui, p, session, slot, kitSlot);
     }
 
-    /** Placeholder: the compact trim screen replaces this in a later task. */
+    /** Opens the compact trim screen; it re-checks armor before showing anything. */
     private void openTrims(Player p) {
-        if (!supportsTrim(session.target())) send(gui, p, "error.cosmetics-not-armor");
+        TrimEditorPage.open(gui, p, session, slot, kitSlot);
     }
 
     private void apply(Player p) {
