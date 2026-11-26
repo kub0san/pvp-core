@@ -355,12 +355,10 @@ pvpcore: # Renamed from 'kits'
     view-public-kit-title: "Viewing Public Kit: {id}"
     enderchest-view-title: "View Only Enderchest"
     regear-shulker-title: "Regear Shulker"
-    customize-title: "<dark_aqua>Customize Kit: {slot}</dark_aqua>"
     enchant-title: "<dark_aqua>Enchant Item</dark_aqua>"
     enchant-level: "<gray>Level <white>{level}</white> / {max}</gray>"
     enchant-added: "<green>Enchantments updated.</green>"
     enchant-removed: "<green>Enchantment removed.</green>"
-    rename-target-title: "<dark_aqua>Select an item to rename</dark_aqua>"
 
     kit-slot-name: "<dark_aqua>Kit {slot}</dark_aqua>"
     enderchest-slot-name: "<dark_aqua>Enderchest {slot}</dark_aqua>"

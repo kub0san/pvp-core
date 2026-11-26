@@ -80,3 +80,11 @@ Reload invalidation live; forced DB write failure; rename timeout; unavailable b
 - Fresh `./gradlew check` exited 0 during review, with `:test` and `:compileJava` reported `UP-TO-DATE`.
 - Live Craftwire checks used `list_instances`, `server_info`, `logs`, `exceptions`, `gui_read`, `gui_action`, `screenshot`, `hud_read`, `chat`, and `server_eval`.
 - Live QA passed for core trim/rename staging, styled titles, named registry entries, queued-to-applied feedback, empty-shield/empty-kit guards, and one-click Back discard.
+
+## Resolution after the kit editor UX redesign (2026-11-26)
+
+This report is retained as a historical record of the PR #28 review. The kit editor UX redesign on `feat/kit-editor-ux-redesign` supersedes the banner-designer findings:
+
+- Defects 1–3 (read-only guard overwritten, unreachable layer controls, normal-banner base dye dropped) are obsolete rather than fixed in place: `BannerDesignerPage`, `BannerPatternPickerPage` and `BannerDesign` were deleted with the oversized customize flow. Reintroduction is deferred and tracked in [issue #35](https://github.com/kub0san/pvp-core/issues/35).
+- Banner GUI, config keys (`customize.max-layers`, `customize.allowed-banner-patterns`) and banner messages/title keys were removed. Existing configs are cleaned automatically by `ConfigUpdater`.
+- Shield banner layers on saved items remain opaque and survive editor save/copy/load (`ShieldMetadataPreservationTest`). Defects 4–5 are not re-verified or claimed resolved by this change; see `docs/kit-cosmetics.md` for the current item-centric flow.

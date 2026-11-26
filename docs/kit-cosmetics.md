@@ -1,30 +1,38 @@
 # Kit Cosmetics GUI
 
-Cosmetic-only GUI for a player's own saved personal kit: armour trims, fully layered shield banners, and validated MiniMessage item names.
+Cosmetic-only editing of a player's own saved personal kit. The editor is **item-centric**: an item is selected in the kit editor, then a compact one-row hub offers Rename, Enchant, Trim (armor only), Apply and Cancel. Shield banner customization was removed; see [Shield banners](#shield-banners-removed).
 
 ## Config
 
-New `customize:` section in `kits/config.yml`:
+`customize:` section in `kits/config.yml`:
 
-- `enabled` (default true) — hides the button, blocks entry, rejects Apply when false.
-- `max-layers` (default 6, clamped 1..16)
-- `allow-click-events` (default false)
-- `allow-hover-events` (default false)
-- `max-name-length` (default 256, clamped 1..1024)
-- `allowed-trim-patterns`, `allowed-trim-materials`, `allowed-banner-patterns` (empty = all)
+- `enabled` (default true) — hides the hub entry, blocks direct entry and rejects Apply when false.
+- `allow-click-events` (default false) — allow `<click:...>` tags in item names.
+- `allow-hover-events` (default false) — allow `<hover:...>` tags in item names.
+- `max-name-length` (default 256, clamped 1..1024).
+- `allowed-trim-patterns`, `allowed-trim-materials` (empty = all).
+
+Legacy `customize.max-layers` and `customize.allowed-banner-patterns` are no longer read. They are removed from existing configs automatically by `ConfigUpdater` (registered in the kits `ConfigSpec.removedKeys`); no manual cleanup is needed.
 
 ## Permissions
 
-`perplayerkit.kit` + `LocationFeature.KITS`, personal kit editor only. Guards rechecked at Apply.
+`perplayerkit.kit` + `LocationFeature.KITS`, personal kit editor only. Guards are rechecked at Apply. The item filter must be ready before entry.
 
-## Staging
+## Item hub
 
-Choices are staged with explicit Apply. Back discards; Reset clears; rename cancel/timeout changes nothing. Names are formatting-only by default (colours, decorations, gradients); click/hover tags rejected unless enabled.
+- **Rename** — chat prompt accepting MiniMessage; formatting-only by default, with click/hover tags rejected unless enabled in config. `cancel` or timeout changes nothing.
+- **Enchant** — paged catalog of registered enchantments. Selecting an entry cycles its level; right-click removes it. The resulting item is validated by `ItemFilter` (over-levelled, incompatible and unsupported enchantments are rejected) before staging; unrelated enchantments are preserved.
+- **Trim** — offered only for genuine armor (`CosmeticValidator.isArmor`). Patterns and materials are picked from `CosmeticCatalog`; a Remove control clears the trim. Shields and weapons never see the button.
+- **Apply / Cancel** — Apply commits staged changes; Cancel discards and returns to the editor. Back/close discards unless a write is pending.
 
-## Banner fail-closed
+## Shield banners (removed)
 
-Unknown/unavailable banner layers lock banner editing for that shield; trim/rename still work. No silent strip.
+Shield banner customization was intentionally removed with the oversized customize flow: the Banner Designer and Banner Pattern Picker screens, `Mode.BANNER`, `CosmeticTarget.SHIELD`, banner-only validator/service checks and config keys are gone. A possible reimplementation is deferred and tracked in [issue #35](https://github.com/kub0san/pvp-core/issues/35) after UX and architecture reconsideration.
 
-## Async save
+Saved shields are unaffected: banner layers on shields in stored kits/enderchests remain opaque and survive edit/copy/save/load untouched. No banner-layer validation or stripping was added to `ItemFilter`; `ShieldMetadataPreservationTest` pins this invariant.
 
-Apply returns QUEUED (not saved). Write completes after close/quit; only feedback/session cleanup discarded. Reload invalidates open sessions.
+## Staging and save
+
+Choices are staged with an explicit Apply. Back discards; reload invalidates open sessions. Names are formatting-only by default (colours, decorations, gradients); click/hover tags are rejected unless enabled.
+
+Apply returns QUEUED, not saved. The write completes after close/quit; only feedback and session cleanup are discarded. Reload invalidates open sessions.
