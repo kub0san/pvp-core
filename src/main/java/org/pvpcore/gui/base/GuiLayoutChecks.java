@@ -136,6 +136,29 @@ public final class GuiLayoutChecks {
                 || GuiLayouts.EC_CONTENT_END > GuiLayouts.EDITOR_EC_CONTROL_START) {
             throw new IllegalStateException("Editor content overlaps its controls");
         }
+
+        // Both editors have exactly four controls (switch, import, clear, back) in their
+        // last row. A fifth control would spill out of the compact inventory.
+        int[] kitControls = {
+                GuiLayouts.EDITOR_KIT_CONTROL_START, GuiLayouts.EDITOR_KIT_CONTROL_START + 1,
+                GuiLayouts.EDITOR_KIT_CONTROL_START + 2, GuiLayouts.EDITOR_KIT_BACK_SLOT
+        };
+        int[] ecControls = {
+                GuiLayouts.EDITOR_EC_CONTROL_START, GuiLayouts.EDITOR_EC_CONTROL_START + 1,
+                GuiLayouts.EDITOR_EC_CONTROL_START + 2, GuiLayouts.EDITOR_EC_BACK_SLOT
+        };
+        assertDistinctAscending("kit editor controls", kitControls);
+        assertDistinctAscending("EC editor controls", ecControls);
+        for (int slot : kitControls) {
+            if (slot < kitLastRowStart || slot >= GuiLayouts.ROWS_EDITOR_KIT * GuiLayouts.COLUMNS) {
+                throw new IllegalStateException("Kit editor control " + slot + " is outside its last row");
+            }
+        }
+        for (int slot : ecControls) {
+            if (slot < ecLastRowStart || slot >= GuiLayouts.ROWS_EDITOR_EC * GuiLayouts.COLUMNS) {
+                throw new IllegalStateException("EC editor control " + slot + " is outside its last row");
+            }
+        }
     }
 
     private static void checkKitRoomRows() {

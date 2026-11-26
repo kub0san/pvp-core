@@ -26,11 +26,11 @@ public final class GuiFrame {
          */
         DOCK,
         /**
-         * Divider row 4, columns 5-8 only. Kit editors keep armor in row 4,
-         * columns 0-4.
+         * Divider row 4, columns 5-8 on the legacy six-row kit editor. The compact
+         * five-row editor paints nothing: its last row is armor plus controls.
          */
         EDITOR_ARMOR,
-        /** Top frame row plus full divider row 4. EC / inspect-EC editors. */
+        /** Top frame plus divider on the legacy EC editor; nothing on the compact four-row one. */
         EDITOR_EC,
         /** No frame. Full-canvas screens that paint their own decoration. */
         NONE
@@ -49,11 +49,19 @@ public final class GuiFrame {
                 }
             }
             case DOCK -> row(frame, rows - 1, glass);
-            case EDITOR_ARMOR -> row(frame, GuiLayouts.EDITOR_DIVIDER_ROW,
-                    GuiLayouts.EDITOR_DIVIDER_FIRST_COL, GuiLayouts.COLUMNS, glass);
+            case EDITOR_ARMOR -> {
+                // Compact kit editor: row 4 holds armor and controls, so no glass there.
+                if (rows != GuiLayouts.ROWS_EDITOR_KIT) {
+                    row(frame, GuiLayouts.EDITOR_DIVIDER_ROW,
+                            GuiLayouts.EDITOR_DIVIDER_FIRST_COL, GuiLayouts.COLUMNS, glass);
+                }
+            }
             case EDITOR_EC -> {
-                row(frame, 0, glass);
-                row(frame, GuiLayouts.EDITOR_DIVIDER_ROW, glass);
+                // Compact EC editor: rows 0-2 are content and row 3 is controls.
+                if (rows != GuiLayouts.ROWS_EDITOR_EC) {
+                    row(frame, 0, glass);
+                    row(frame, GuiLayouts.EDITOR_DIVIDER_ROW, glass);
+                }
             }
             case NONE -> { /* nothing */ }
         }
