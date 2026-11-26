@@ -59,7 +59,7 @@ public class GUI implements GuiSession {
     // Instance state, per ADR 0008: pending rename/chat operations and reload invalidation.
     private final Map<UUID, PendingCustomize> pendingCustomize = new ConcurrentHashMap<>();
     private final Set<UUID> staleCustomize = ConcurrentHashMap.newKeySet();
-    // Refcounted: switching between customize, rename and banner screens must not
+    // Refcounted: switching between the item hub and cosmetic sub-screens must not
     // untrack a viewer while another of those screens is still open.
     private final Map<UUID, Integer> openCustomizeScreens = new ConcurrentHashMap<>();
 
@@ -152,8 +152,8 @@ public class GUI implements GuiSession {
      * Stores a session for an async prompt and returns the id the callback must present.
      *
      * <p>Starting a chat/async prompt is not a fresh editor entry: this deliberately keeps any
-     * reload stale marker. Only {@code CustomizePage.open} clears stale state; a pending
-     * operation must not.</p>
+     * reload stale marker. Only a fresh {@code CustomizePage.open} of the item hub clears stale
+     * state; a pending operation (such as a rename prompt) must not.</p>
      */
     public UUID setPendingCustomize(UUID viewer, CustomizeSession session) {
         return holdPendingCustomize(viewer, session);

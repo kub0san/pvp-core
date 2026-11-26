@@ -218,7 +218,7 @@ public final class BannerDesignerPage extends GuiScreen {
                 GuiLayouts.BANNER_REVERT_SLOT / GuiLayouts.COLUMNS);
         chrome.addItem(wrap(GuiTheme.back(), (p, e) -> {
             SoundManager.playClick(p);
-            CustomizePage.reopen(gui, p, kitSlot, session);
+            CustomizePage.reopen(gui, p, session, session.targetSlot(), kitSlot);
         }, player), GuiLayouts.BANNER_BACK_SLOT % GuiLayouts.COLUMNS,
                 GuiLayouts.BANNER_BACK_SLOT / GuiLayouts.COLUMNS);
 
@@ -244,7 +244,7 @@ public final class BannerDesignerPage extends GuiScreen {
                 gui.kits().lang().send(p, "error.cosmetics-banner-locked");
                 return;
             }
-            CustomizePage.reopen(gui, p, kitSlot, session);
+            CustomizePage.reopen(gui, p, session, session.targetSlot(), kitSlot);
         }, player), GuiLayouts.BANNER_APPLY_SLOT % GuiLayouts.COLUMNS,
                 GuiLayouts.BANNER_APPLY_SLOT / GuiLayouts.COLUMNS);
     }

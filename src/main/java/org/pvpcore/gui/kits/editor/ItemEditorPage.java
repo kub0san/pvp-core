@@ -279,7 +279,7 @@ public final class ItemEditorPage extends GuiScreen {
             event.setCancelled(true);
             ItemStack current = event.getCurrentItem();
             if (current != null && !current.getType().isAir()) {
-                openCustomize();
+                openCustomize(raw - spec.contentStart());
             }
             return;
         }
@@ -319,15 +319,16 @@ public final class ItemEditorPage extends GuiScreen {
         }
     }
 
-    /** Shift-click entry into cosmetics. The item-specific hub arrives with the UX redesign. */
-    private void openCustomize() {
+    /** Shift-click entry into the item-specific cosmetics hub. */
+    private void openCustomize(int itemSlot) {
         GUI.EditorContext context = spec.context();
         if (!spec.editable() || context == null || context.type() != GUI.EditorType.KIT) {
             return;
         }
         gui.flushOpenEditor(player);
-        CustomizePage.open(gui, player, context.slot(),
-                new CustomizeSession(gui.kits().kitManager().getPlayerKit(player.getUniqueId(), context.slot())));
+        CustomizePage.open(gui, player,
+                new CustomizeSession(gui.kits().kitManager().getPlayerKit(player.getUniqueId(), context.slot())),
+                itemSlot, context.slot());
     }
 
     @Override
