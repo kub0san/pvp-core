@@ -21,9 +21,9 @@ Legacy `customize.max-layers` and `customize.allowed-banner-patterns` are no lon
 ## Item hub
 
 - **Rename** — chat prompt accepting MiniMessage; formatting-only by default, with click/hover tags rejected unless enabled in config. `cancel` or timeout changes nothing.
-- **Enchant** — paged catalog of registered enchantments. Selecting an entry cycles its level; right-click removes it. The resulting item is validated by `ItemFilter` (over-levelled, incompatible and unsupported enchantments are rejected) before staging; unrelated enchantments are preserved.
+- **Enchant** — paged catalog of registered enchantments. Selecting an entry cycles its level; right-click removes it. The resulting item is validated by `ItemFilter` before staging; unrelated enchantments are preserved. With the shipped default `item-filter.enabled: false`, validation is a no-op: over-levelled, conflicting and unsupported enchantments are accepted and the browser's compatibility badge is informational only. Enable `item-filter` to enforce rules.
 - **Trim** — offered only for genuine armor (`CosmeticValidator.isArmor`). Patterns and materials are picked from `CosmeticCatalog`; a Remove control clears the trim. Shields and weapons never see the button.
-- **Apply / Cancel** — Apply commits staged changes; Cancel discards and returns to the editor. Back/close discards unless a write is pending.
+- **Apply / Cancel** — Apply commits staged changes; Cancel discards and returns to the editor. Back from a sub-editor keeps staged edits; closing the hub discards only when it is the last customize screen and no write or rename prompt is pending. Sub-editor close does not discard.
 
 ## Shield banners (removed)
 

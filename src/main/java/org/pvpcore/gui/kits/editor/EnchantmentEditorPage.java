@@ -42,8 +42,9 @@ import java.util.function.Predicate;
  * Compact three-row enchantment editor for one kit item.
  *
  * <p>Clicks build a private draft: left-click advances one level and stays at the effective
- * maximum, right-click removes it. Every change is checked against the kit item filter before
- * the draft accepts it. Nothing reaches the {@link CustomizeSession} until Apply, and unrelated
+ * maximum, right-click removes it. Every change is offered to the configured {@link ItemFilter}
+ * policy and checked against it before the draft accepts it; the check is a no-op when the filter
+ * is disabled. Nothing reaches the {@link CustomizeSession} until Apply, and unrelated
  * enchantments are left untouched. The selected item itself is shown in a read-only preview.</p>
  */
 public final class EnchantmentEditorPage extends GuiScreen {
