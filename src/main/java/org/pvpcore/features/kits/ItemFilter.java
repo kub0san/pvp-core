@@ -37,6 +37,14 @@ public class ItemFilter {
     /** why: legacy static whitelist cache retained for external/legacy compatibility; instance filtering uses current kit-room whitelist state. */
     public static Set<String> whitelist = java.util.concurrent.ConcurrentHashMap.newKeySet();
     private static final int MAX_CONTAINER_DEPTH = 16; // why: recursion guard constant retained for nested container/bundle filtering safety.
+
+    /**
+     * Effective ceiling for enchant levels when the configured policy imposes no upper bound.
+     * This is an immutable sentinel, not a level to apply: the browser renders it as an infinity
+     * sign and left-click simply keeps increasing. It mirrors the absence of a level check in
+     * {@link #allowedEnchants} for explicit zero caps, over-levelled rules and disabled filters.
+     */
+    public static final int UNBOUNDED_ENCHANT_LEVEL = Integer.MAX_VALUE;
     private final KitsContext context;
     private final ItemFilterRules.Settings settings;
     private final Plugin plugin;
@@ -137,14 +145,20 @@ public class ItemFilter {
     }
 
     /**
-     * Configured level cap for one enchantment on an item. {@code 0} means no configured cap, so
-     * callers fall back to the enchantment's vanilla maximum; the cap applies to stored enchants
-     * on books as well as applied enchants on other items.
+     * Configured level cap for one enchantment on an item, distinct from its effective ceiling.
+     * Returns {@code 0} both when no cap is configured and when a cap is explicitly zero; use
+     * {@link #configuredCap} to distinguish those states. The cap applies to stored enchants on
+     * books as well as applied enchants on other items.
      */
     public int maxLevel(ItemStack item, Enchantment enchantment) {
-        if (enchantment == null || item == null || item.getType().isAir()) return 0;
-        Integer max = settings.forMaterial(item.getType()).enchantments().get(enchantment.getKey().toString());
+        Integer max = configuredCap(item, enchantment);
         return max == null ? 0 : max;
+    }
+
+    /** Nullable raw rule value: absent cap versus explicit zero are deliberately different. */
+    private Integer configuredCap(ItemStack item, Enchantment enchantment) {
+        if (enchantment == null || item == null || item.getType().isAir()) return null;
+        return settings.forMaterial(item.getType()).enchantments().get(enchantment.getKey().toString());
     }
 
     /** Read-only: whether this filter enforces any configured rules at all. */
@@ -153,15 +167,20 @@ public class ItemFilter {
     }
 
     /**
-     * The level ceiling the editor may offer. A positive configured cap wins; an absent or
-     * zero cap falls back to the enchantment's vanilla maximum, exactly as {@link #maxLevel}
-     * and {@link #allowedEnchants} treat the tri-state cap. This is the single source for
-     * the browser ceiling so Apply can never disagree with what the browser offers.
+     * The level ceiling the browser may offer, derived from the same tri-state rule
+     * {@link #allowedEnchants} enforces: a positive configured cap is that cap; an explicit
+     * zero cap, an absent cap with {@code allow-over-levelled}, and a disabled filter are all
+     * unbounded; otherwise the vanilla maximum applies. A browser offering this ceiling can
+     * never offer a level Apply rejects, and never hides levels Apply accepts.
      */
     public int effectiveMaxLevel(ItemStack item, Enchantment enchantment) {
         if (enchantment == null || item == null || item.getType().isAir()) return 1;
-        int configured = maxLevel(item, enchantment);
-        if (configured > 0) return configured;
+        if (!settings.enabled()) return UNBOUNDED_ENCHANT_LEVEL;
+        Integer cap = configuredCap(item, enchantment);
+        if (cap != null) {
+            return cap > 0 ? cap : UNBOUNDED_ENCHANT_LEVEL;
+        }
+        if (settings.forMaterial(item.getType()).overLevelled()) return UNBOUNDED_ENCHANT_LEVEL;
         try {
             return Math.max(1, enchantment.getMaxLevel());
         } catch (RuntimeException | LinkageError ex) {

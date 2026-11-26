@@ -1,5 +1,6 @@
 package org.pvpcore.gui.kits.editor;
 
+import com.github.stefvanschie.inventoryframework.gui.GuiItem;
 import net.kyori.adventure.text.Component;
 import org.bukkit.Material;
 import org.bukkit.enchantments.Enchantment;
@@ -8,12 +9,15 @@ import org.bukkit.event.inventory.ClickType;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.EnchantmentStorageMeta;
 import org.bukkit.inventory.meta.ItemMeta;
+import org.bukkit.plugin.Plugin;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockbukkit.mockbukkit.MockBukkit;
 import org.mockbukkit.mockbukkit.ServerMock;
 import org.bukkit.configuration.file.YamlConfiguration;
+import org.pvpcore.config.kits.ItemFilterRules;
+import org.pvpcore.features.kits.ItemFilter;
 import org.pvpcore.features.kits.KitsContext;
 import org.pvpcore.features.kits.cosmetics.CustomizeSession;
 import org.pvpcore.features.kits.cosmetics.EnchantmentCatalog;
@@ -26,8 +30,10 @@ import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.util.List;
+import java.util.Map;
 import java.util.function.Predicate;
 
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -146,7 +152,7 @@ class EnchantmentEditorPageTest {
     }
 
     @Test
-    void cancelRestoresTheEntrySnapshotAndBackKeepsStagedEdits() {
+    void cancelRestoresTheEntrySnapshotForBothInitialStagedStates() {
         CustomizeSession unstaged = session(Material.DIAMOND_SWORD, 3);
         unstaged.selectTarget(3);
         ItemStack original = unstaged.target();
@@ -162,9 +168,77 @@ class EnchantmentEditorPageTest {
         staged.stageTarget(entrySnapshot);
         staged.stageTarget(new ItemStack(Material.DIAMOND_SWORD));
         EnchantmentEditorPage.restoreOnCancel(staged, entrySnapshot, true);
-        assertTrue(staged.isStaged(3), "Back-style navigation keeps the entry's staged edits");
+        assertTrue(staged.isStaged(3), "Cancel restores the entry's staged snapshot");
         assertEquals(Material.IRON_SWORD, staged.target().getType());
         assertEquals(1, staged.target().getEnchantmentLevel(Enchantment.UNBREAKING));
+    }
+
+    @Test
+    void unboundedPolicyOffersAndAcceptsLevelsBeyondVanilla() throws Exception {
+        YamlConfiguration config = new YamlConfiguration();
+        config.set("item-filter.enabled", true);
+        config.set("item-filter.enchantments.allow-over-levelled", true);
+        ItemFilter filter = filter(config);
+        ItemStack sword = new ItemStack(Material.DIAMOND_SWORD);
+        int beyond = Enchantment.SHARPNESS.getMaxLevel() + 2;
+        int ceiling = filter.effectiveMaxLevel(sword, Enchantment.SHARPNESS);
+
+        assertEquals(ItemFilter.UNBOUNDED_ENCHANT_LEVEL, ceiling);
+        assertEquals(beyond, EnchantmentEditorPage.nextLevel(beyond - 1, ceiling));
+        assertEquals("∞", EnchantmentEditorPage.maxLabel(ceiling));
+
+        CustomizeSession session = session(Material.DIAMOND_SWORD, 3);
+        session.selectTarget(3);
+        ItemStack candidate = sword.clone();
+        ItemMeta meta = candidate.getItemMeta();
+        meta.addEnchant(Enchantment.SHARPNESS, beyond, true);
+        candidate.setItemMeta(meta);
+        assertTrue(EnchantmentEditorPage.stageIfAllowed(session, candidate, filter::allowed));
+        assertEquals(beyond, session.target().getEnchantmentLevel(Enchantment.SHARPNESS));
+    }
+
+    @Test
+    void paintedSlotsAndReadOnlyPreviewMatchTheContract() throws Exception {
+        var injected = EnchantmentCatalog.entries().subList(0, 19).stream()
+                .map(EnchantmentCatalog.Entry::enchantment).toList();
+        EnchantmentEditorPage page = new EnchantmentEditorPage(gui, viewer,
+                session(Material.DIAMOND_SWORD, 3), 3, 3, new EnchantmentCatalog(injected));
+        page.paintForTest();
+
+        Map<Integer, GuiItem> content = page.paintedContent();
+        for (int slot = 0; slot <= 17; slot++) {
+            assertTrue(content.containsKey(slot), "entry slot " + slot);
+        }
+        for (int slot = 18; slot <= 20; slot++) {
+            assertTrue(content.containsKey(slot), "card slot " + slot);
+        }
+        Map<Integer, GuiItem> firstChrome = page.paintedChrome();
+        for (int slot : List.of(21, 23, 24, 25, 26)) {
+            assertTrue(firstChrome.containsKey(slot), "first-page nav slot " + slot);
+        }
+        page.pageForTest(1);
+        page.paintForTest();
+        Map<Integer, GuiItem> secondChrome = page.paintedChrome();
+        for (int slot : List.of(21, 22, 24, 25, 26)) {
+            assertTrue(secondChrome.containsKey(slot), "second-page nav slot " + slot);
+        }
+        assertDoesNotThrow(() -> content.get(18).callAction(null), "preview has no click handler");
+    }
+
+    @Test
+    void backPathKeepsStagedEdits() throws Exception {
+        CustomizeSession session = session(Material.DIAMOND_SWORD, 3);
+        session.selectTarget(3);
+        ItemStack staged = new ItemStack(Material.IRON_SWORD);
+        staged.addEnchantment(Enchantment.UNBREAKING, 1);
+        session.stageTarget(staged);
+
+        EnchantmentEditorPage page = page(session, 3, 3);
+        page.back(viewer);
+
+        assertTrue(session.isStaged(3));
+        assertEquals(Material.IRON_SWORD, session.target().getType());
+        assertEquals(1, session.target().getEnchantmentLevel(Enchantment.UNBREAKING));
     }
 
     @Test
@@ -192,6 +266,13 @@ class EnchantmentEditorPageTest {
         context.setLang(lang);
         context.setStyleManager(new StyleManager(context));
         return context;
+    }
+
+    private static ItemFilter filter(YamlConfiguration config) throws Exception {
+        Constructor<ItemFilter> constructor = ItemFilter.class.getDeclaredConstructor(
+                ItemFilterRules.Settings.class, Plugin.class);
+        constructor.setAccessible(true);
+        return constructor.newInstance(ItemFilterRules.parse(config), null);
     }
 
     private static Object allocate(Class<?> type) throws Exception {

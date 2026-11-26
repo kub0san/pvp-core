@@ -104,6 +104,16 @@ class EnchantmentCatalogTest {
     }
 
     @Test
+    void identicalHumanLabelsTieBreakByKey() {
+        Enchantment later = stub("z-mod:same", Component.text("Same"), null);
+        Enchantment earlier = stub("a-mod:same", Component.text("Same"), null);
+        var entries = new EnchantmentCatalog(List.of(later, earlier)).getEntries();
+
+        assertEquals(List.of("a-mod:same", "z-mod:same"), entries.stream().map(e -> e.key()).toList());
+        assertEquals(List.of("Same", "Same"), entries.stream().map(e -> plain(e.label())).toList());
+    }
+
+    @Test
     void translationKeyDisplayNameFallsBackToHumanReadableKey() {
         Enchantment stub = stub("test-mod:wrap_around", Component.translatable("enchantment.test.wrap"), null);
         var entry = new EnchantmentCatalog(List.of(stub)).getEntries().getFirst();

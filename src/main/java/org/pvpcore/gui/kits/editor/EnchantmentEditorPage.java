@@ -19,6 +19,7 @@ import org.pvpcore.features.kits.ItemFilter;
 import org.pvpcore.features.kits.KitsContext;
 import org.pvpcore.features.kits.cosmetics.CustomizeSession;
 import org.pvpcore.features.kits.cosmetics.EnchantmentCatalog;
+import org.pvpcore.gui.base.GuiClick;
 import org.pvpcore.gui.base.GuiFrame;
 import org.pvpcore.gui.base.GuiGuard;
 import org.pvpcore.gui.base.GuiLayouts;
@@ -32,6 +33,7 @@ import org.pvpcore.util.kits.LocationFeature;
 import org.pvpcore.util.kits.SoundManager;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Predicate;
@@ -73,8 +75,8 @@ public final class EnchantmentEditorPage extends GuiScreen {
         this(gui, player, session, slot, kitSlot, new EnchantmentCatalog());
     }
 
-    private EnchantmentEditorPage(GUI gui, Player player, CustomizeSession session, int slot, int kitSlot,
-                                  EnchantmentCatalog catalog) {
+    EnchantmentEditorPage(GUI gui, Player player, CustomizeSession session, int slot, int kitSlot,
+                          EnchantmentCatalog catalog) {
         super(gui, player, ROWS, GuiFrame.Density.NONE, "perplayerkit.kit", LocationFeature.KITS);
         this.gui = gui;
         this.session = session;
@@ -168,6 +170,54 @@ public final class EnchantmentEditorPage extends GuiScreen {
         return GuiPreviewItems.displayClone(source);
     }
 
+    /** Renders the unbounded policy sentinel without exposing a giant number to players. */
+    static String maxLabel(int max) {
+        return max == ItemFilter.UNBOUNDED_ENCHANT_LEVEL ? "∞" : String.valueOf(max);
+    }
+
+    /** Pager state seam for package-local tests; production never calls it. */
+    void pageForTest(int page) {
+        this.page = page;
+    }
+
+    /** Paints the two panes without opening a chest, for package-local contract tests. */
+    void paintForTest() {
+        contentPane.clear();
+        chromePane.clear();
+        renderContent(contentPane);
+        renderChrome(chromePane);
+    }
+
+    Map<Integer, GuiItem> paintedContent() {
+        return paintedSlots(contentPane);
+    }
+
+    Map<Integer, GuiItem> paintedChrome() {
+        return paintedSlots(chromePane);
+    }
+
+    /**
+     * Explicit plugin owner instead of InventoryFramework's classloader lookup: the jar is
+     * relocated into this plugin, but standalone tests load IF from the test classpath.
+     */
+    private GuiItem clickable(ItemStack item, GuiClick click) {
+        return new GuiItem(item, event -> {
+            Player clicker = event.getWhoClicked() instanceof Player p ? p : player;
+            click.on(clicker, event);
+        }, gui.plugin());
+    }
+
+    private GuiItem display(ItemStack item) {
+        return new GuiItem(item, gui.plugin());
+    }
+
+    private static Map<Integer, GuiItem> paintedSlots(StaticPane pane) {
+        Map<Integer, GuiItem> slots = new HashMap<>();
+        pane.getSlottedItems().forEach((slot, item) -> slots.put(
+                slot.getX(GuiLayouts.COLUMNS) + slot.getY(GuiLayouts.COLUMNS) * GuiLayouts.COLUMNS, item));
+        return Map.copyOf(slots);
+    }
+
     @Override
     protected void renderContent(StaticPane content) {
         List<EnchantmentCatalog.Entry> entries = catalog.getEntries();
@@ -189,25 +239,25 @@ public final class EnchantmentEditorPage extends GuiScreen {
         int current = currentLevel(draft, entry.enchantment());
         int max = effectiveMax(draft, entry.enchantment());
         ItemStack icon = displayIcon(entry, current, max);
-        content.addItem(wrap(icon, (p, e) -> {
+        content.addItem(clickable(icon, (p, e) -> {
             SoundManager.playClick(p);
             // Read the level at click time; a stale painted value must never drive a change.
             int requested = requestedLevel(draft, entry.enchantment(), e.getClick(), max);
             if (requested != currentLevel(draft, entry.enchantment())) {
                 changeLevel(p, entry.enchantment(), requested);
             }
-        }, player), raw % GuiLayouts.COLUMNS, raw / GuiLayouts.COLUMNS);
+        }), raw % GuiLayouts.COLUMNS, raw / GuiLayouts.COLUMNS);
     }
 
     private void paintEmpty(StaticPane content) {
         for (int raw = 0; raw <= GuiLayouts.COSMETIC_BROWSER_ENTRY_LAST; raw++) {
             if (raw == 4) continue;
-            content.addItem(new GuiItem(GuiTheme.filler(kits())),
+            content.addItem(display(GuiTheme.filler(kits())),
                     raw % GuiLayouts.COLUMNS, raw / GuiLayouts.COLUMNS);
         }
         ItemStack card = card(Material.BOOK, "Enchantments",
                 List.of(deserialize(message("gui.enchant-empty"))));
-        content.addItem(new GuiItem(card), 4 % GuiLayouts.COLUMNS, 4 / GuiLayouts.COLUMNS);
+        content.addItem(display(card), 4 % GuiLayouts.COLUMNS, 4 / GuiLayouts.COLUMNS);
     }
 
     private void paintPreview(StaticPane content) {
@@ -215,7 +265,7 @@ public final class EnchantmentEditorPage extends GuiScreen {
         ItemStack display = preview(draft);
         ItemStack item = display == null ? GuiTheme.filler(kits()) : display;
         // No click handler: this slot is a display-only showcase.
-        content.addItem(new GuiItem(item), raw % GuiLayouts.COLUMNS, raw / GuiLayouts.COLUMNS);
+        content.addItem(display(item), raw % GuiLayouts.COLUMNS, raw / GuiLayouts.COLUMNS);
     }
 
     private void paintState(StaticPane content, List<EnchantmentCatalog.Entry> entries) {
@@ -231,12 +281,12 @@ public final class EnchantmentEditorPage extends GuiScreen {
             lore.add(deserialize(message("gui.enchant-selected",
                     "name", EnchantmentCatalog.plain(selected.label()),
                     "level", String.valueOf(level),
-                    "max", String.valueOf(effectiveMax(draft, selected.enchantment())))));
+                    "max", maxLabel(effectiveMax(draft, selected.enchantment())))));
             lore.add(deserialize(message("gui.enchant-category", "category", selected.category())));
             lore.add(selected.description());
         }
         int raw = GuiLayouts.COSMETIC_BROWSER_STATE_SLOT;
-        content.addItem(new GuiItem(card(Material.BOOK, "Selected enchant", lore)),
+        content.addItem(display(card(Material.BOOK, "Selected enchant", lore)),
                 raw % GuiLayouts.COLUMNS, raw / GuiLayouts.COLUMNS);
     }
 
@@ -250,7 +300,7 @@ public final class EnchantmentEditorPage extends GuiScreen {
                     .decoration(TextDecoration.ITALIC, false));
         }
         int raw = GuiLayouts.COSMETIC_BROWSER_HINT_SLOT;
-        content.addItem(new GuiItem(card(Material.PAPER, "How to use", lore)),
+        content.addItem(display(card(Material.PAPER, "How to use", lore)),
                 raw % GuiLayouts.COLUMNS, raw / GuiLayouts.COLUMNS);
     }
 
@@ -273,13 +323,13 @@ public final class EnchantmentEditorPage extends GuiScreen {
         ItemStack icon = entry.icon(level);
         ItemMeta meta = icon.getItemMeta();
         if (meta == null) return icon;
+        // The level/current-max line appears once, in the name; duplicating it in lore only
+        // makes the tooltip noisy without adding information.
         meta.displayName(deserialize(message("gui.enchant-selected",
                 "name", EnchantmentCatalog.plain(entry.label()),
                 "level", String.valueOf(level),
-                "max", String.valueOf(max))));
+                "max", maxLabel(max))));
         List<Component> lore = new ArrayList<>();
-        lore.add(deserialize(message("gui.enchant-level",
-                "level", String.valueOf(level), "max", String.valueOf(max))));
         lore.add(statusLine(entry.enchantment()));
         lore.add(deserialize(message("gui.enchant-hint")));
         meta.lore(lore);
@@ -344,45 +394,45 @@ public final class EnchantmentEditorPage extends GuiScreen {
         List<EnchantmentCatalog.Entry> entries = catalog.getEntries();
         GuiPager pager = GuiPager.of(page, entries.size(), ENTRIES_PER_PAGE);
 
-        chrome.addItem(wrap(GuiTheme.named(Material.ARROW, GuiTheme.MUTED, "Back",
+        chrome.addItem(clickable(GuiTheme.named(Material.ARROW, GuiTheme.MUTED, "Back",
                 message("gui.enchant-back-hint")), (p, e) -> {
             SoundManager.playClick(p);
-            reopenHub(p);
-        }, player), BACK_SLOT % GuiLayouts.COLUMNS, BACK_SLOT / GuiLayouts.COLUMNS);
+            back(p);
+        }), BACK_SLOT % GuiLayouts.COLUMNS, BACK_SLOT / GuiLayouts.COLUMNS);
 
         if (showsPager(entries.size())) {
             if (page > 0) {
-                chrome.addItem(wrap(GuiTheme.arrow(false, page - 1, pager.maxPages()), (p, e) -> {
+                chrome.addItem(clickable(GuiTheme.arrow(false, page - 1, pager.maxPages()), (p, e) -> {
                     SoundManager.playClick(p);
                     page--;
                     refresh();
-                }, player), PREV_SLOT % GuiLayouts.COLUMNS, PREV_SLOT / GuiLayouts.COLUMNS);
+                }), PREV_SLOT % GuiLayouts.COLUMNS, PREV_SLOT / GuiLayouts.COLUMNS);
             }
             if (page < pager.maxPages() - 1) {
-                chrome.addItem(wrap(GuiTheme.arrow(true, page + 1, pager.maxPages()), (p, e) -> {
+                chrome.addItem(clickable(GuiTheme.arrow(true, page + 1, pager.maxPages()), (p, e) -> {
                     SoundManager.playClick(p);
                     page++;
                     refresh();
-                }, player), NEXT_SLOT % GuiLayouts.COLUMNS, NEXT_SLOT / GuiLayouts.COLUMNS);
+                }), NEXT_SLOT % GuiLayouts.COLUMNS, NEXT_SLOT / GuiLayouts.COLUMNS);
             }
-            chrome.addItem(wrap(GuiTheme.pageItem(page, pager.maxPages()), (p, e) -> {
+            chrome.addItem(clickable(GuiTheme.pageItem(page, pager.maxPages()), (p, e) -> {
                 SoundManager.playClick(p);
                 page = (page + 1) % pager.maxPages();
                 refresh();
-            }, player), PAGE_SLOT % GuiLayouts.COLUMNS, PAGE_SLOT / GuiLayouts.COLUMNS);
+            }), PAGE_SLOT % GuiLayouts.COLUMNS, PAGE_SLOT / GuiLayouts.COLUMNS);
         }
 
-        chrome.addItem(wrap(GuiTheme.named(Material.LIME_DYE, GuiTheme.GREEN + "<bold>", "Apply Enchants",
+        chrome.addItem(clickable(GuiTheme.named(Material.LIME_DYE, GuiTheme.GREEN + "<bold>", "Apply Enchants",
                 message("gui.enchant-apply-hint")), (p, e) -> {
             SoundManager.playClick(p);
             apply(p);
-        }, player), APPLY_SLOT % GuiLayouts.COLUMNS, APPLY_SLOT / GuiLayouts.COLUMNS);
+        }), APPLY_SLOT % GuiLayouts.COLUMNS, APPLY_SLOT / GuiLayouts.COLUMNS);
 
-        chrome.addItem(wrap(GuiTheme.dangerTool(Material.BARRIER, "Cancel",
+        chrome.addItem(clickable(GuiTheme.dangerTool(Material.BARRIER, "Cancel",
                 message("gui.enchant-cancel-hint"), "Click", "revert"), (p, e) -> {
             SoundManager.playClick(p);
             cancel(p);
-        }, player), CANCEL_SLOT % GuiLayouts.COLUMNS, CANCEL_SLOT / GuiLayouts.COLUMNS);
+        }), CANCEL_SLOT % GuiLayouts.COLUMNS, CANCEL_SLOT / GuiLayouts.COLUMNS);
     }
 
     // ------------------------------------------------------------------ editing
@@ -510,6 +560,11 @@ public final class EnchantmentEditorPage extends GuiScreen {
 
     private void cancel(Player player) {
         restoreOnCancel(session, entrySnapshot, entryWasStaged);
+        reopenHub(player);
+    }
+
+    /** Back keeps staged edits: only Cancel restores the entry snapshot. */
+    void back(Player player) {
         reopenHub(player);
     }
 
