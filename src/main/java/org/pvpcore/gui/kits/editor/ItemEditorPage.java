@@ -280,7 +280,10 @@ public final class ItemEditorPage extends GuiScreen {
             event.setCancelled(true);
             ItemStack current = event.getCurrentItem();
             if (current != null && !current.getType().isAir()) {
-                event.setCursor(current.clone());
+                // The slot holds a display clone; copy the original stack, never the hints.
+                ItemStack copy = current.clone();
+                EditorHintLore.strip(copy);
+                event.setCursor(copy);
             }
             return;
         }
@@ -338,7 +341,9 @@ public final class ItemEditorPage extends GuiScreen {
         ItemStack[] content = spec.content();
         for (int i = 0; i < spec.contentLength(); i++) {
             ItemStack item = content != null && i < content.length ? content[i] : null;
-            inventory.setItem(spec.contentStart() + i, item);
+            // Only the visible clone carries hints; the stored item stays untouched.
+            ItemStack display = item == null ? null : EditorHintLore.apply(item.clone());
+            inventory.setItem(spec.contentStart() + i, display);
         }
         // Must come after show(): opening the new inventory closes the previous one,
         // and that close would otherwise consume this context.

@@ -72,7 +72,12 @@ public final class EditorSaver {
     static ItemStack[] editableContents(ItemStack[] view, GUI.EditorType type) {
         int start = type.contentStart();
         int end = type.contentEnd();
-        return KitContents.copyRange(view, start, end - start);
+        ItemStack[] items = KitContents.copyRange(view, start, end - start);
+        // The inventory holds display clones; never persist their hover hints.
+        for (ItemStack item : items) {
+            EditorHintLore.strip(item);
+        }
+        return items;
     }
 
     private static void savePersonal(KitsContext kitsCtx, Player player, GUI.EditorContext context,
