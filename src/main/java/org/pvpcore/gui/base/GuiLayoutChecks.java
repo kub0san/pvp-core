@@ -61,12 +61,18 @@ public final class GuiLayoutChecks {
     }
 
     /**
-     * Three-row cosmetic screens. Package-private so tests can feed corrupt arrays through
-     * the exact code {@link #verify()} delegates to, without mutable statics. Legacy
-     * six-row customize slots overlap these numbers and are deliberately not compared.
+     * Three-row cosmetic screens. Package-private so tests can feed corrupt arrays and card
+     * slots through the exact code {@link #verify()} delegates to, without mutable statics.
+     * Legacy six-row customize slots overlap these numbers and are deliberately not compared.
      */
     static void checkCosmeticLayouts(int[] hub, int[] enchantNav, int[] trimNav,
-                                     int entriesPerPage, int size) {
+                                     int entriesPerPage, int size,
+                                     int preview, int state, int hint) {
+        // Guard inputs first: a corrupt array must name the broken invariant, never NPE/AIOOBE.
+        requireCosmeticArray("customise hub", hub, 9);
+        requireCosmeticArray("enchant nav", enchantNav, GuiLayouts.COLUMNS - 3);
+        requireCosmeticArray("trim nav", trimNav, GuiLayouts.COLUMNS - 3);
+
         assertEqual("COSMETIC_BROWSER_ENTRIES_PER_PAGE", entriesPerPage, 18);
         assertEqual("COSMETIC_BROWSER_SIZE", size, 27);
         assertEqual("COSMETIC_HUB_SIZE", size, 27);
@@ -81,37 +87,46 @@ public final class GuiLayoutChecks {
         assertEqual("COSMETIC_HUB_APPLY_SLOT", hub[6], hub[5] + 2);
         assertEqual("COSMETIC_HUB_CANCEL_SLOT", hub[7], hub[6] + 2);
         assertEqual("COSMETIC_HUB_HINT_SLOT", hub[8], 21);
-        assertEqual("cosmetic hub slot count", hub.length, 9);
 
         int entryLast = entriesPerPage - 1;
-        int preview = entryLast + 1;
-        int state = preview + 1;
-        int hint = state + 1;
         if (entryLast >= preview) {
             throw new IllegalStateException("Cosmetic browser entries overlap the preview slot");
         }
+        assertEqual("browser state slot", state, preview + 1);
+        assertEqual("browser hint slot", hint, state + 1);
 
         assertCosmeticSlots("customise hub", hub, size);
-        assertCosmeticSlots("enchant browser", cosmeticBrowserSlots(enchantNav, entriesPerPage), size);
-        assertCosmeticSlots("trim browser", cosmeticBrowserSlots(trimNav, entriesPerPage), size);
+        assertCosmeticSlots("enchant browser",
+                cosmeticBrowserSlots(enchantNav, entriesPerPage, preview, state, hint), size);
+        assertCosmeticSlots("trim browser",
+                cosmeticBrowserSlots(trimNav, entriesPerPage, preview, state, hint), size);
 
-        // Both nav rows must start immediately after the browser hint slot.
+        // Both nav rows must start immediately after the injected hint slot.
         assertEqual("cosmetic enchant nav first", enchantNav[0], hint + 1);
         assertEqual("cosmetic trim nav first", trimNav[0], hint + 1);
-        assertEqual("cosmetic enchant nav count", enchantNav.length, GuiLayouts.COLUMNS - 3);
-        assertEqual("cosmetic trim nav count", trimNav.length, GuiLayouts.COLUMNS - 3);
     }
 
-    /** Entries, then preview / state / hint, then the screen's six nav slots. */
-    private static int[] cosmeticBrowserSlots(int[] nav, int entriesPerPage) {
+    private static void requireCosmeticArray(String name, int[] slots, int expectedLength) {
+        if (slots == null) {
+            throw new IllegalStateException(name + " slots must not be null");
+        }
+        if (slots.length != expectedLength) {
+            throw new IllegalStateException(
+                    name + " must have " + expectedLength + " slots; got " + slots.length);
+        }
+    }
+
+    /** Entries, then the injected preview / state / hint cards, then the screen's nav slots. */
+    private static int[] cosmeticBrowserSlots(int[] nav, int entriesPerPage,
+                                              int preview, int state, int hint) {
         int[] slots = new int[entriesPerPage + 3 + nav.length];
         int index = 0;
         for (int slot = 0; slot < entriesPerPage; slot++) {
             slots[index++] = slot;
         }
-        slots[index++] = entriesPerPage;     // preview
-        slots[index++] = entriesPerPage + 1; // state
-        slots[index++] = entriesPerPage + 2; // hint
+        slots[index++] = preview;
+        slots[index++] = state;
+        slots[index++] = hint;
         System.arraycopy(nav, 0, slots, index, nav.length);
         return slots;
     }
@@ -161,7 +176,10 @@ public final class GuiLayoutChecks {
                         GuiLayouts.COSMETIC_TRIM_REMOVE_SLOT, GuiLayouts.COSMETIC_TRIM_BACK_SLOT
                 },
                 GuiLayouts.COSMETIC_BROWSER_ENTRIES_PER_PAGE,
-                GuiLayouts.COSMETIC_BROWSER_SIZE);
+                GuiLayouts.COSMETIC_BROWSER_SIZE,
+                GuiLayouts.COSMETIC_BROWSER_PREVIEW_SLOT,
+                GuiLayouts.COSMETIC_BROWSER_STATE_SLOT,
+                GuiLayouts.COSMETIC_BROWSER_HINT_SLOT);
     }
 
     // ------------------------------------------------------------------ screens

@@ -36,9 +36,9 @@ class GuiLayoutChecksTest {
         assertEquals(0, GuiLayouts.COSMETIC_BROWSER_ENTRY_FIRST);
         assertEquals(GuiLayouts.COSMETIC_BROWSER_ENTRY_FIRST
                 + GuiLayouts.COSMETIC_BROWSER_ENTRIES_PER_PAGE - 1, GuiLayouts.COSMETIC_BROWSER_ENTRY_LAST);
-        assertTrue(GuiLayouts.COSMETIC_BROWSER_ENTRY_LAST < GuiLayouts.COSMETIC_BROWSER_PREVIEW_SLOT);
-        assertEquals(GuiLayouts.COSMETIC_BROWSER_PREVIEW_SLOT + 1, GuiLayouts.COSMETIC_BROWSER_STATE_SLOT);
-        assertEquals(GuiLayouts.COSMETIC_BROWSER_STATE_SLOT + 1, GuiLayouts.COSMETIC_BROWSER_HINT_SLOT);
+        assertTrue(GuiLayouts.COSMETIC_BROWSER_ENTRY_LAST < previewSlot());
+        assertEquals(previewSlot() + 1, stateSlot());
+        assertEquals(stateSlot() + 1, hintSlot());
     }
 
     @Test
@@ -46,7 +46,8 @@ class GuiLayoutChecksTest {
         // Call the package-private check directly: this is the same code verify() delegates to.
         assertDoesNotThrow(() -> GuiLayoutChecks.checkCosmeticLayouts(
                 hubSlots(), enchantNavSlots(), trimNavSlots(),
-                GuiLayouts.COSMETIC_BROWSER_ENTRIES_PER_PAGE, GuiLayouts.COSMETIC_BROWSER_SIZE));
+                GuiLayouts.COSMETIC_BROWSER_ENTRIES_PER_PAGE, GuiLayouts.COSMETIC_BROWSER_SIZE,
+                previewSlot(), stateSlot(), hintSlot()));
         assertDoesNotThrow(GuiLayoutChecks::verify);
     }
 
@@ -58,7 +59,7 @@ class GuiLayoutChecksTest {
                 () -> GuiLayoutChecks.checkCosmeticLayouts(
                         hubSlots(), enchantNavSlots(), trimNav,
                         GuiLayouts.COSMETIC_BROWSER_ENTRIES_PER_PAGE,
-                        GuiLayouts.COSMETIC_BROWSER_SIZE));
+                        GuiLayouts.COSMETIC_BROWSER_SIZE, previewSlot(), stateSlot(), hintSlot()));
 
         assertTrue(failure.getMessage().contains("duplicate"), failure.getMessage());
     }
@@ -71,7 +72,7 @@ class GuiLayoutChecksTest {
                 () -> GuiLayoutChecks.checkCosmeticLayouts(
                         hubSlots(), enchantNavSlots(), trimNav,
                         GuiLayouts.COSMETIC_BROWSER_ENTRIES_PER_PAGE,
-                        GuiLayouts.COSMETIC_BROWSER_SIZE));
+                        GuiLayouts.COSMETIC_BROWSER_SIZE, previewSlot(), stateSlot(), hintSlot()));
 
         assertTrue(failure.getMessage().contains("outside"), failure.getMessage());
     }
@@ -81,7 +82,7 @@ class GuiLayoutChecksTest {
         IllegalStateException failure = assertThrows(IllegalStateException.class,
                 () -> GuiLayoutChecks.checkCosmeticLayouts(
                         hubSlots(), enchantNavSlots(), trimNavSlots(),
-                        17, GuiLayouts.COSMETIC_BROWSER_SIZE));
+                        17, GuiLayouts.COSMETIC_BROWSER_SIZE, previewSlot(), stateSlot(), hintSlot()));
 
         assertTrue(failure.getMessage().contains("COSMETIC_BROWSER_ENTRIES_PER_PAGE"),
                 failure.getMessage());
@@ -95,7 +96,7 @@ class GuiLayoutChecksTest {
                 () -> GuiLayoutChecks.checkCosmeticLayouts(
                         hubSlots(), enchantNav, trimNavSlots(),
                         GuiLayouts.COSMETIC_BROWSER_ENTRIES_PER_PAGE,
-                        GuiLayouts.COSMETIC_BROWSER_SIZE));
+                        GuiLayouts.COSMETIC_BROWSER_SIZE, previewSlot(), stateSlot(), hintSlot()));
 
         assertTrue(failure.getMessage().contains("nav first"), failure.getMessage());
     }
@@ -109,9 +110,108 @@ class GuiLayoutChecksTest {
                 () -> GuiLayoutChecks.checkCosmeticLayouts(
                         hub, enchantNavSlots(), trimNavSlots(),
                         GuiLayouts.COSMETIC_BROWSER_ENTRIES_PER_PAGE,
-                        GuiLayouts.COSMETIC_BROWSER_SIZE));
+                        GuiLayouts.COSMETIC_BROWSER_SIZE, previewSlot(), stateSlot(), hintSlot()));
 
         assertTrue(failure.getMessage().contains("COSMETIC_HUB_PREVIEW_SLOT"), failure.getMessage());
+    }
+
+    @Test
+    void cosmeticCheckRejectsPreviewOverlappingEntries() {
+        int preview = GuiLayouts.COSMETIC_BROWSER_ENTRY_LAST; // 17, not after the entries
+
+        IllegalStateException failure = assertThrows(IllegalStateException.class,
+                () -> GuiLayoutChecks.checkCosmeticLayouts(
+                        hubSlots(), enchantNavSlots(), trimNavSlots(),
+                        GuiLayouts.COSMETIC_BROWSER_ENTRIES_PER_PAGE,
+                        GuiLayouts.COSMETIC_BROWSER_SIZE, preview, preview + 1, preview + 2));
+
+        assertTrue(failure.getMessage().contains("overlap"), failure.getMessage());
+    }
+
+    @Test
+    void cosmeticCheckRejectsMisplacedStateSlot() {
+        int state = previewSlot() + 2;
+
+        IllegalStateException failure = assertThrows(IllegalStateException.class,
+                () -> GuiLayoutChecks.checkCosmeticLayouts(
+                        hubSlots(), enchantNavSlots(), trimNavSlots(),
+                        GuiLayouts.COSMETIC_BROWSER_ENTRIES_PER_PAGE,
+                        GuiLayouts.COSMETIC_BROWSER_SIZE, previewSlot(), state, state + 1));
+
+        assertTrue(failure.getMessage().contains("state slot"), failure.getMessage());
+    }
+
+    @Test
+    void cosmeticCheckRejectsMisplacedHintSlot() {
+        int hint = stateSlot() + 2;
+
+        IllegalStateException failure = assertThrows(IllegalStateException.class,
+                () -> GuiLayoutChecks.checkCosmeticLayouts(
+                        hubSlots(), enchantNavSlots(), trimNavSlots(),
+                        GuiLayouts.COSMETIC_BROWSER_ENTRIES_PER_PAGE,
+                        GuiLayouts.COSMETIC_BROWSER_SIZE, previewSlot(), stateSlot(), hint));
+
+        assertTrue(failure.getMessage().contains("hint slot"), failure.getMessage());
+    }
+
+    @Test
+    void cosmeticCheckRejectsNullSlotArrays() {
+        IllegalStateException hubFailure = assertThrows(IllegalStateException.class,
+                () -> GuiLayoutChecks.checkCosmeticLayouts(
+                        null, enchantNavSlots(), trimNavSlots(),
+                        GuiLayouts.COSMETIC_BROWSER_ENTRIES_PER_PAGE,
+                        GuiLayouts.COSMETIC_BROWSER_SIZE, previewSlot(), stateSlot(), hintSlot()));
+        assertTrue(hubFailure.getMessage().contains("must not be null"), hubFailure.getMessage());
+
+        IllegalStateException enchantFailure = assertThrows(IllegalStateException.class,
+                () -> GuiLayoutChecks.checkCosmeticLayouts(
+                        hubSlots(), null, trimNavSlots(),
+                        GuiLayouts.COSMETIC_BROWSER_ENTRIES_PER_PAGE,
+                        GuiLayouts.COSMETIC_BROWSER_SIZE, previewSlot(), stateSlot(), hintSlot()));
+        assertTrue(enchantFailure.getMessage().contains("must not be null"), enchantFailure.getMessage());
+
+        IllegalStateException trimFailure = assertThrows(IllegalStateException.class,
+                () -> GuiLayoutChecks.checkCosmeticLayouts(
+                        hubSlots(), enchantNavSlots(), null,
+                        GuiLayouts.COSMETIC_BROWSER_ENTRIES_PER_PAGE,
+                        GuiLayouts.COSMETIC_BROWSER_SIZE, previewSlot(), stateSlot(), hintSlot()));
+        assertTrue(trimFailure.getMessage().contains("must not be null"), trimFailure.getMessage());
+    }
+
+    @Test
+    void cosmeticCheckRejectsShortSlotArrays() {
+        IllegalStateException hubFailure = assertThrows(IllegalStateException.class,
+                () -> GuiLayoutChecks.checkCosmeticLayouts(
+                        java.util.Arrays.copyOf(hubSlots(), 8), enchantNavSlots(), trimNavSlots(),
+                        GuiLayouts.COSMETIC_BROWSER_ENTRIES_PER_PAGE,
+                        GuiLayouts.COSMETIC_BROWSER_SIZE, previewSlot(), stateSlot(), hintSlot()));
+        assertTrue(hubFailure.getMessage().contains("must have 9 slots"), hubFailure.getMessage());
+
+        IllegalStateException enchantFailure = assertThrows(IllegalStateException.class,
+                () -> GuiLayoutChecks.checkCosmeticLayouts(
+                        hubSlots(), java.util.Arrays.copyOf(enchantNavSlots(), 5), trimNavSlots(),
+                        GuiLayouts.COSMETIC_BROWSER_ENTRIES_PER_PAGE,
+                        GuiLayouts.COSMETIC_BROWSER_SIZE, previewSlot(), stateSlot(), hintSlot()));
+        assertTrue(enchantFailure.getMessage().contains("must have 6 slots"), enchantFailure.getMessage());
+
+        IllegalStateException trimFailure = assertThrows(IllegalStateException.class,
+                () -> GuiLayoutChecks.checkCosmeticLayouts(
+                        hubSlots(), enchantNavSlots(), java.util.Arrays.copyOf(trimNavSlots(), 5),
+                        GuiLayouts.COSMETIC_BROWSER_ENTRIES_PER_PAGE,
+                        GuiLayouts.COSMETIC_BROWSER_SIZE, previewSlot(), stateSlot(), hintSlot()));
+        assertTrue(trimFailure.getMessage().contains("must have 6 slots"), trimFailure.getMessage());
+    }
+
+    private static int previewSlot() {
+        return GuiLayouts.COSMETIC_BROWSER_PREVIEW_SLOT;
+    }
+
+    private static int stateSlot() {
+        return GuiLayouts.COSMETIC_BROWSER_STATE_SLOT;
+    }
+
+    private static int hintSlot() {
+        return GuiLayouts.COSMETIC_BROWSER_HINT_SLOT;
     }
 
     private static int[] hubSlots() {
