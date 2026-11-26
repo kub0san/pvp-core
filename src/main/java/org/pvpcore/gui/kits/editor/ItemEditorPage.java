@@ -259,6 +259,9 @@ public final class ItemEditorPage extends GuiScreen {
      * the content range must keep working.
      */
     private void handleContentClick(InventoryClickEvent event) {
+        if (!spec.editable()) {
+            return;
+        }
         int raw = event.getRawSlot();
         int start = spec.contentStart();
         int end = start + spec.contentLength();
@@ -288,15 +291,19 @@ public final class ItemEditorPage extends GuiScreen {
         }
     }
 
-    /** Stops bottom-inventory number-key/offhand swaps from reaching the editor's slots. */
+    /** Stops offhand swaps and bottom-inventory number-key swaps from reaching the editor's slots. */
     private void handleGlobalClick(InventoryClickEvent event) {
+        // Offhand swaps must be cancelled regardless of which inventory the click originated in:
+        // a top-slot F-click can still move an item into or out of the editor's offhand slot.
+        if (event.getClick() == ClickType.SWAP_OFFHAND) {
+            event.setCancelled(true);
+            return;
+        }
         if (event.getRawSlot() < topSize()) {
             return;
         }
-        ClickType click = event.getClick();
         InventoryAction action = event.getAction();
-        if (action == InventoryAction.HOTBAR_SWAP || action == InventoryAction.HOTBAR_MOVE_AND_READD
-                || click == ClickType.SWAP_OFFHAND) {
+        if (action == InventoryAction.HOTBAR_SWAP || action == InventoryAction.HOTBAR_MOVE_AND_READD) {
             event.setCancelled(true);
         }
     }
