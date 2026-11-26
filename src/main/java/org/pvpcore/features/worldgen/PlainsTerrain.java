@@ -215,7 +215,11 @@ final class PlainsTerrain implements TerrainProfile {
         double tilt = TILT_FRAC * tierH * landform;
 
         int y = (int) Math.round(cfg.surfaceY() + height + ledges + foothills + micro + tilt);
-        return Math.max(minY + 16, Math.min(maxY - 8, y));
+        // Guard against worlds shorter than 24 blocks: keep lo <= hi so the clamp never
+        // returns a value outside [minY, maxY].
+        int lo = Math.min(minY + 16, maxY - 1);
+        int hi = Math.max(lo, maxY - 8);
+        return Math.max(lo, Math.min(hi, y));
     }
 
     /**

@@ -40,7 +40,7 @@ public final class TeleportModule implements PvPCoreModule {
 
     @Override
     public Set<String> dependsOn() {
-        return Set.of("worldgen");
+        return Set.of();
     }
 
     @Override

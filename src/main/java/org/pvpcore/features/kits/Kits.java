@@ -167,7 +167,7 @@ public final class Kits implements PvPCoreModule {
 
     @Override
     public Set<String> dependsOn() {
-        return Set.of("teleport");
+        return Set.of();
     }
 
     @Override

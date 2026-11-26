@@ -231,7 +231,7 @@ final class KitsLifecycle {
 
                 KitManager km = ctx.kitManager();
                 if (km != null) {
-                    km.getPublicKitList().clear();
+                    km.clearPublicKits();
                     loadPublicKitsIdsFromConfig(ctx);
                     km.getPublicKitList().forEach(kit -> km.loadPublicKitFromDB(kit.id));
                 }

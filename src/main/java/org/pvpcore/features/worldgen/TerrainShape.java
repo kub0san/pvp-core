@@ -41,6 +41,9 @@ final class TerrainShape {
      */
     static int surfaceY(int baseY, double tierHeight, double smoothness, double roughness,
                         long seed, int x, int z, int minY, int maxY) {
+        // Keep the desert profile consistent with the plains profile, which clamps
+        // tier-height to [4, 40] before use.
+        tierHeight = NoiseHelper.clamp(tierHeight, 4.0, 40.0);
 
         // 1. Wander the coordinates so tier borders are irregular.
         double wx = x + fbm(x * WARP_FREQUENCY, z * WARP_FREQUENCY, seed + 11, 2) * WARP_STRENGTH;
@@ -71,8 +74,8 @@ final class TerrainShape {
         int y = (int) Math.round(baseY + height + (dunes + micro + slope) * roughness);
 
         // Keep room for bedrock/sand below and for decoration above.
-        int lo = minY + 16;
-        int hi = maxY - 8;
+        int lo = Math.min(minY + 16, maxY - 1);
+        int hi = Math.max(lo, maxY - 8);
         return Math.max(lo, Math.min(hi, y));
     }
 

@@ -101,7 +101,7 @@ final class NoiseHelper {
     // Internal helpers
     // -------------------------------------------------------------------------
 
-    private static int floor(double v) { return v < 0 ? (int) v - 1 : (int) v; }
+    private static int floor(double v) { return (int) Math.floor(v); }
     private static double mix(double a, double b, double t) { return a + (b - a) * t; }
 
     private static long murmur(long h) {
