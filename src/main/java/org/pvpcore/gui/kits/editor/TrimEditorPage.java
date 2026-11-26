@@ -250,16 +250,17 @@ public final class TrimEditorPage extends GuiScreen {
                 "material", statusValue(selectedMaterial, catalog.trimMaterials()));
     }
 
-    /** Explicit selection gets its catalog label; a first-key fallback is marked "(default)". */
+    /**
+     * No selection means the untrimmed draft is on display, so the state line must not name a
+     * concrete catalog trim; "None (default)" truthfully describes either half of the pair.
+     */
     private static String statusValue(String key, List<CosmeticCatalog.Entry> options) {
-        boolean fallback = key == null;
-        String resolved = fallback ? firstKey(options) : key;
-        String label = options.stream()
-                .filter(entry -> entry.key().equals(resolved))
+        if (key == null) return "None (default)";
+        return options.stream()
+                .filter(entry -> entry.key().equals(key))
                 .map(CosmeticCatalog.Entry::label)
                 .findFirst()
-                .orElse(resolved == null ? "None" : resolved);
-        return label + (fallback ? " (default)" : "");
+                .orElse(key);
     }
 
     private void paintCard(StaticPane pane, int raw, Material material, String name,

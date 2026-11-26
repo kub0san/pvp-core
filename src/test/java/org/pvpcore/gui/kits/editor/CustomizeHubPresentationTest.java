@@ -5,15 +5,23 @@ import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 import org.bukkit.Material;
 import org.bukkit.configuration.file.YamlConfiguration;
+import org.bukkit.enchantments.Enchantment;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
+import org.bukkit.inventory.meta.ArmorMeta;
 import org.bukkit.inventory.meta.ItemMeta;
+import org.bukkit.inventory.meta.trim.ArmorTrim;
+import org.bukkit.inventory.meta.trim.TrimMaterial;
+import org.bukkit.inventory.meta.trim.TrimPattern;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockbukkit.mockbukkit.MockBukkit;
 import org.mockbukkit.mockbukkit.ServerMock;
+import org.pvpcore.config.kits.CustomizeRules;
 import org.pvpcore.features.kits.KitsContext;
+import org.pvpcore.features.kits.cosmetics.CosmeticApplier;
+import org.pvpcore.features.kits.cosmetics.CosmeticValidator;
 import org.pvpcore.features.kits.cosmetics.CustomizeSession;
 import org.pvpcore.gui.base.GuiLayouts;
 import org.pvpcore.gui.kits.GUI;
@@ -32,6 +40,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** Contract for the three-row cosmetic hub: showcase, cards, filler and the pinned action slots. */
@@ -121,6 +130,43 @@ class CustomizeHubPresentationTest {
     }
 
     @Test
+    void showcaseReflectsStagedEnchantAndTrimOnReopen() throws Exception {
+        CustomizeSession session = session(Material.DIAMOND_CHESTPLATE, 6);
+        CustomizePage first = page(session, 6, 3);
+        first.paintForTest();
+        assertNull(trim(first.paintedContent().get(GuiLayouts.COSMETIC_HUB_PREVIEW_SLOT).getItem()));
+
+        ItemStack decorated = session.target();
+        decorated.addEnchantment(Enchantment.PROTECTION, 2);
+        CustomizeRules rules = CustomizeRules.parse(null);
+        CosmeticApplier applier = new CosmeticApplier(rules, new CosmeticValidator(rules));
+        decorated = applier.applyTrim(decorated, TrimMaterial.DIAMOND, TrimPattern.COAST);
+        ItemMeta meta = decorated.getItemMeta();
+        meta.displayName(Component.text("Staged Armor"));
+        decorated.setItemMeta(meta);
+        session.stageTarget(decorated);
+
+        CustomizePage reopened = page(session, 6, 3);
+        reopened.paintForTest();
+        ItemStack display = reopened.paintedContent()
+                .get(GuiLayouts.COSMETIC_HUB_PREVIEW_SLOT).getItem();
+        assertEquals("Staged Armor", plainName(display));
+        assertEquals(2, display.getEnchantmentLevel(Enchantment.PROTECTION));
+        ArmorTrim painted = trim(display);
+        assertNotNull(painted);
+        assertEquals(TrimPattern.COAST, painted.getPattern());
+        assertFalse(EditorHintLore.has(display));
+    }
+
+    @Test
+    void hubIsExactlyThreeRowsAndTwentySevenSlots() throws Exception {
+        CustomizePage page = page(session(Material.DIAMOND_SWORD, 0), 0, 3);
+        assertEquals(3, page.rows());
+        assertEquals(27, page.topSize());
+        assertEquals(GuiLayouts.COSMETIC_HUB_SIZE, page.topSize());
+    }
+
+    @Test
     void emptyTargetShowcaseIsSafeAndReadOnly() throws Exception {
         CustomizeSession session = new CustomizeSession(new ItemStack[41]);
         session.selectTarget(7);
@@ -202,6 +248,11 @@ class CustomizeHubPresentationTest {
 
     private static String plainName(ItemStack item) {
         return PLAIN.serialize(item.getItemMeta().displayName());
+    }
+
+    private static ArmorTrim trim(ItemStack item) {
+        if (item == null || !(item.getItemMeta() instanceof ArmorMeta armor)) return null;
+        return armor.getTrim();
     }
 
     private static String lore(GuiItem item) {

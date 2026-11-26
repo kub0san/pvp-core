@@ -144,6 +144,60 @@ class TrimPresentationTest {
     }
 
     @Test
+    void noSelectionStateLineIsTruthfulAndPreviewIsUntrimmed() throws Exception {
+        CosmeticCatalog catalog = catalog("minecraft:bolt", "Bolt Pattern",
+                "minecraft:diamond", "Diamond Material");
+        TrimEditorPage page = new TrimEditorPage(gui, viewer,
+                session(Material.DIAMOND_CHESTPLATE, 4), 4, 3, catalog);
+        page.paintForTest();
+
+        Map<Integer, GuiItem> content = page.paintedContent();
+        String state = lore(content.get(GuiLayouts.COSMETIC_BROWSER_STATE_SLOT));
+        assertTrue(state.contains("None (default)"), state);
+        assertFalse(state.contains("Bolt Pattern"),
+                "no selection must not claim a concrete pattern is applied: " + state);
+        assertFalse(state.contains("Diamond Material"),
+                "no selection must not claim a concrete material is applied: " + state);
+        assertNull(trim(content.get(GuiLayouts.COSMETIC_BROWSER_PREVIEW_SLOT).getItem()),
+                "a fresh open shows the untrimmed draft, not the first catalog key");
+    }
+
+    @Test
+    void removeClearsThePaintedPreviewAndPinsTheDefaultStateLine() throws Exception {
+        CosmeticCatalog catalog = catalog("minecraft:bolt", "Bolt Pattern",
+                "minecraft:diamond", "Diamond Material");
+        TrimEditorPage page = new TrimEditorPage(gui, viewer,
+                session(Material.DIAMOND_CHESTPLATE, 4), 4, 3, catalog);
+        page.selectResolved(viewer, TrimMaterial.DIAMOND, TrimPattern.COAST);
+        page.paintForTest();
+        assertNotNull(trim(page.paintedContent()
+                .get(GuiLayouts.COSMETIC_BROWSER_PREVIEW_SLOT).getItem()));
+
+        page.remove(viewer);
+        page.paintForTest();
+
+        Map<Integer, GuiItem> content = page.paintedContent();
+        assertNull(trim(content.get(GuiLayouts.COSMETIC_BROWSER_PREVIEW_SLOT).getItem()),
+                "Remove must not silently reapply the first catalog key");
+        String state = lore(content.get(GuiLayouts.COSMETIC_BROWSER_STATE_SLOT));
+        assertTrue(state.contains("None (default)"), state);
+        assertFalse(state.contains("Bolt Pattern"), state);
+        assertFalse(state.contains("Diamond Material"), state);
+    }
+
+    @Test
+    void paintedPreviewShowsTheSelectedTrimAfterAClick() throws Exception {
+        TrimEditorPage page = page(session(Material.DIAMOND_CHESTPLATE, 4), 4, 3);
+        page.selectResolved(viewer, TrimMaterial.DIAMOND, TrimPattern.COAST);
+        page.paintForTest();
+
+        ArmorTrim painted = trim(page.paintedContent()
+                .get(GuiLayouts.COSMETIC_BROWSER_PREVIEW_SLOT).getItem());
+        assertNotNull(painted);
+        assertEquals(TrimPattern.COAST, painted.getPattern());
+    }
+
+    @Test
     void modeSwitchRepaintsModeCopyWithoutLosingThePreview() throws Exception {
         TrimEditorPage page = page(session(Material.DIAMOND_CHESTPLATE, 4), 4, 3);
         page.selectResolved(viewer, TrimMaterial.DIAMOND, TrimPattern.COAST);
@@ -214,6 +268,20 @@ class TrimPresentationTest {
     private static CosmeticApplier applier() {
         CustomizeRules rules = CustomizeRules.parse(null);
         return new CosmeticApplier(rules, new CosmeticValidator(rules));
+    }
+
+    /** Deterministic two-entry catalog so state copy cannot hide behind empty test registries. */
+    private static CosmeticCatalog catalog(String patternKey, String patternLabel,
+                                           String materialKey, String materialLabel) throws Exception {
+        Constructor<CosmeticCatalog> constructor = CosmeticCatalog.class.getDeclaredConstructor(
+                List.class, List.class, CustomizeRules.class);
+        constructor.setAccessible(true);
+        return constructor.newInstance(
+                List.of(new CosmeticCatalog.Entry(patternKey, patternLabel,
+                        new ItemStack(Material.BOLT_ARMOR_TRIM_SMITHING_TEMPLATE))),
+                List.of(new CosmeticCatalog.Entry(materialKey, materialLabel,
+                        new ItemStack(Material.DIAMOND))),
+                CustomizeRules.parse(null));
     }
 
     private static ArmorTrim trim(ItemStack item) {

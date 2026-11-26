@@ -86,7 +86,16 @@ class ItemCustomizePageTest {
 
         CustomizeSession sword = session(Material.DIAMOND_SWORD, 0);
         sword.selectTarget(0);
-        assertEquals(4, CustomizePage.hubButtons(sword).size());
+        List<CustomizePage.HubButton> swordButtons = CustomizePage.hubButtons(sword);
+        assertEquals(4, swordButtons.size());
+        assertEquals(List.of(0, 2, 6, 8),
+                swordButtons.stream().map(CustomizePage.HubButton::column).toList());
+        assertFalse(swordButtons.stream().anyMatch(button -> button.icon() == Material.NETHERITE_INGOT),
+                "no Trim action for a non-armor target");
+        assertTrue(swordButtons.stream().anyMatch(button -> button.icon() == Material.NAME_TAG));
+        assertTrue(swordButtons.stream().anyMatch(button -> button.icon() == Material.ENCHANTED_BOOK));
+        assertTrue(swordButtons.stream().anyMatch(button -> button.icon() == Material.LIME_DYE));
+        assertTrue(swordButtons.stream().anyMatch(button -> button.icon() == Material.BARRIER));
     }
 
     @Test
