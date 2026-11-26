@@ -87,13 +87,6 @@ final class WorldGenSettings {
                     + " is smaller than one chunk; using 16.");
             maxRadius = 16;
         }
-        if (maxRadius * 2L > borderDiameter) {
-            int clamped = borderDiameter / 2;
-            logger.warning("worldgen: world-border-diameter=" + borderDiameter
-                    + " is smaller than 2 * max-radius-blocks=" + maxRadius
-                    + "; clamping max-radius-blocks to " + Math.max(1, clamped) + ".");
-            maxRadius = Math.max(1, clamped);
-        }
 
         Set<String> expected = Set.of();
         if (section != null) {
