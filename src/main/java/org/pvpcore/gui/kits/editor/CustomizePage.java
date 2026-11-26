@@ -1,14 +1,21 @@
 package org.pvpcore.gui.kits.editor;
 
+import com.github.stefvanschie.inventoryframework.gui.GuiItem;
 import com.github.stefvanschie.inventoryframework.gui.type.ChestGui;
 import com.github.stefvanschie.inventoryframework.pane.StaticPane;
+import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.format.NamedTextColor;
+import net.kyori.adventure.text.format.TextDecoration;
+import net.kyori.adventure.text.minimessage.MiniMessage;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
+import org.bukkit.inventory.meta.ItemMeta;
 import org.pvpcore.commands.kits.core.ActionGuards;
 import org.pvpcore.config.kits.CustomizeRules;
 import org.pvpcore.features.kits.KitManager;
+import org.pvpcore.features.kits.KitsContext;
 import org.pvpcore.features.kits.cosmetics.ApplyResult;
 import org.pvpcore.features.kits.cosmetics.CosmeticApplier;
 import org.pvpcore.features.kits.cosmetics.CosmeticValidator;
@@ -20,6 +27,7 @@ import org.pvpcore.gui.base.GuiFrame;
 import org.pvpcore.gui.base.GuiGuard;
 import org.pvpcore.gui.base.GuiLayouts;
 import org.pvpcore.gui.base.GuiMenuFactory;
+import org.pvpcore.gui.base.GuiPreviewItems;
 import org.pvpcore.gui.base.GuiScreen;
 import org.pvpcore.gui.base.GuiTheme;
 import org.pvpcore.gui.kits.GUI;
@@ -27,7 +35,10 @@ import org.pvpcore.util.kits.LocationFeature;
 import org.pvpcore.util.kits.SoundManager;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -38,13 +49,21 @@ import java.util.UUID;
  * screen is deliberately read-only and 27 slots so it cannot be used to shuffle kit contents.</p>
  */
 public final class CustomizePage extends GuiScreen {
-    private static final int HUB_ROWS = 3;
-    private static final int HUB_ROW = 1;
-    private static final int RENAME_COL = 0;
-    private static final int ENCHANT_COL = 2;
-    private static final int TRIM_COL = 4;
-    private static final int APPLY_COL = 6;
-    private static final int CANCEL_COL = 8;
+    private static final int HUB_ROWS = GuiLayouts.COSMETIC_HUB_ROWS;
+    private static final int HUB_ROW = GuiLayouts.COSMETIC_HUB_RENAME_SLOT / GuiLayouts.COLUMNS;
+    private static final int RENAME_COL = GuiLayouts.COSMETIC_HUB_RENAME_SLOT % GuiLayouts.COLUMNS;
+    private static final int ENCHANT_COL = GuiLayouts.COSMETIC_HUB_ENCHANT_SLOT % GuiLayouts.COLUMNS;
+    private static final int TRIM_COL = GuiLayouts.COSMETIC_HUB_TRIM_SLOT % GuiLayouts.COLUMNS;
+    private static final int APPLY_COL = GuiLayouts.COSMETIC_HUB_APPLY_SLOT % GuiLayouts.COLUMNS;
+    private static final int CANCEL_COL = GuiLayouts.COSMETIC_HUB_CANCEL_SLOT % GuiLayouts.COLUMNS;
+
+    /** Slots owned by a card or an action button; the low-priority frame never fills them. */
+    private static final Set<Integer> RESERVED_SLOTS = Set.of(
+            GuiLayouts.COSMETIC_HUB_INFO_SLOT, GuiLayouts.COSMETIC_HUB_PREVIEW_SLOT,
+            GuiLayouts.COSMETIC_HUB_STATE_SLOT, GuiLayouts.COSMETIC_HUB_RENAME_SLOT,
+            GuiLayouts.COSMETIC_HUB_ENCHANT_SLOT, GuiLayouts.COSMETIC_HUB_TRIM_SLOT,
+            GuiLayouts.COSMETIC_HUB_APPLY_SLOT, GuiLayouts.COSMETIC_HUB_CANCEL_SLOT,
+            GuiLayouts.COSMETIC_HUB_HINT_SLOT);
 
     private final GUI gui;
     private final int kitSlot;
@@ -97,10 +116,16 @@ public final class CustomizePage extends GuiScreen {
 
     @Override
     protected String title() {
-        if (kits() == null) return "Customize Item";
-        // GuiScreen expects a legacy title; sectionTitle converts MiniMessage so the brand
-        // colour and bold actually render instead of showing literal tags in-game.
-        return GuiMenuFactory.sectionTitle(kits(), GuiTheme.ACCENT + "<bold>Customize Item");
+        return renderedTitle(kits(), kitSlot);
+    }
+
+    /**
+     * Title seam: the kit slot is always substituted, so neither this screen nor a reopened
+     * one can show a literal {@code {slot}} token from the message template.
+     */
+    static String renderedTitle(KitsContext kits, int slot) {
+        if (kits == null || kits.lang() == null) return "Customize Item";
+        return GuiMenuFactory.langTitle(kits, "gui.customize-title", "slot", String.valueOf(slot));
     }
 
     private static CustomizeRules rulesOf(GUI gui) {
@@ -118,8 +143,125 @@ public final class CustomizePage extends GuiScreen {
     }
 
     @Override
+    protected void renderFrame(StaticPane frame) {
+        super.renderFrame(frame);
+        // Decoration lives at LOW priority, so a card or button can always paint over it.
+        // Reserved slots are left empty here: they belong to content or chrome, never filler.
+        ItemStack glass = GuiTheme.filler(kits());
+        for (int raw = 0; raw < GuiLayouts.COSMETIC_HUB_SIZE; raw++) {
+            if (RESERVED_SLOTS.contains(raw)) continue;
+            frame.addItem(new GuiItem(glass.clone(), gui.plugin()),
+                    raw % GuiLayouts.COLUMNS, raw / GuiLayouts.COLUMNS);
+        }
+    }
+
+    @Override
     protected void renderContent(StaticPane content) {
         // No content picker: the item is selected in the editor before this screen opens.
+        paintCard(content, GuiLayouts.COSMETIC_HUB_INFO_SLOT, Material.PAPER, "Selected item",
+                List.of(
+                        line("Kit " + kitSlot, NamedTextColor.AQUA, true),
+                        line("Slot " + slot + " - selected item", NamedTextColor.GRAY, false),
+                        deserialize(message("gui.customize-preview-readonly"))));
+
+        // Showcase: a protected, display-only clone. No click handler and no theme styling,
+        // so enchants, trims and the staged name are exactly what the player will save.
+        ItemStack display = GuiPreviewItems.displayClone(session == null ? null : session.target());
+        content.addItem(displayItem(display == null ? GuiTheme.filler(kits()) : display),
+                GuiLayouts.COSMETIC_HUB_PREVIEW_SLOT % GuiLayouts.COLUMNS,
+                GuiLayouts.COSMETIC_HUB_PREVIEW_SLOT / GuiLayouts.COLUMNS);
+
+        boolean staged = session != null && session.isStaged(session.targetSlot());
+        paintCard(content, GuiLayouts.COSMETIC_HUB_STATE_SLOT,
+                staged ? Material.LIME_DYE : Material.GRAY_DYE, "Staged state",
+                List.of(deserialize(message(staged
+                        ? "gui.customize-staged" : "gui.customize-unstaged"))));
+
+        paintCard(content, GuiLayouts.COSMETIC_HUB_HINT_SLOT, Material.PAPER, "How to use",
+                List.of(deserialize(message("gui.customize-hub-hint"))));
+    }
+
+    private void paintCard(StaticPane pane, int raw, Material material, String name,
+                           List<Component> lore) {
+        pane.addItem(displayItem(card(material, name, lore)),
+                raw % GuiLayouts.COLUMNS, raw / GuiLayouts.COLUMNS);
+    }
+
+    /** A GuiItem with no click handler, used for showcases and information cards. */
+    private GuiItem displayItem(ItemStack item) {
+        return new GuiItem(item, gui.plugin());
+    }
+
+    private static ItemStack card(Material material, String name, List<Component> lore) {
+        ItemStack card = new ItemStack(material);
+        ItemMeta meta = card.getItemMeta();
+        if (meta != null) {
+            meta.displayName(line(name, NamedTextColor.AQUA, true));
+            meta.lore(lore);
+            card.setItemMeta(meta);
+        }
+        return card;
+    }
+
+    private static Component line(String text, NamedTextColor color, boolean bold) {
+        return Component.text(text).color(color)
+                .decoration(TextDecoration.BOLD, bold)
+                .decoration(TextDecoration.ITALIC, false);
+    }
+
+    /** Message lookup with placeholder substitution even when the language facade is absent. */
+    private String message(String key, String... pairs) {
+        String raw = kits() != null && kits().lang() != null
+                ? kits().lang().raw(key, pairs)
+                : fallback(key);
+        for (int i = 0; i + 1 < pairs.length; i += 2) {
+            raw = raw.replace("{" + pairs[i] + "}", String.valueOf(pairs[i + 1]));
+        }
+        return raw;
+    }
+
+    private static String fallback(String key) {
+        return switch (key) {
+            case "gui.customize-preview-readonly" -> "Preview - read only";
+            case "gui.customize-staged" -> "Staged changes";
+            case "gui.customize-unstaged" -> "No staged changes";
+            case "gui.customize-hub-hint" -> "Back keeps staged edits; Cancel discards them";
+            default -> key;
+        };
+    }
+
+    private static Component deserialize(String miniMessage) {
+        return MiniMessage.miniMessage().deserialize(miniMessage);
+    }
+
+    // ---- package-local paint seams for contract tests (production never calls them) ----
+
+    void paintForTest() {
+        framePane.clear();
+        contentPane.clear();
+        chromePane.clear();
+        renderFrame(framePane);
+        renderContent(contentPane);
+        renderChrome(chromePane);
+    }
+
+    Map<Integer, GuiItem> paintedFrame() {
+        return paintedSlots(framePane);
+    }
+
+    Map<Integer, GuiItem> paintedContent() {
+        return paintedSlots(contentPane);
+    }
+
+    Map<Integer, GuiItem> paintedChrome() {
+        return paintedSlots(chromePane);
+    }
+
+    private static Map<Integer, GuiItem> paintedSlots(StaticPane pane) {
+        Map<Integer, GuiItem> slots = new HashMap<>();
+        pane.getSlottedItems().forEach((slot, item) -> slots.put(
+                slot.getX(GuiLayouts.COLUMNS) + slot.getY(GuiLayouts.COLUMNS) * GuiLayouts.COLUMNS, item));
+        return Map.copyOf(slots);
     }
 
     private enum Action { RENAME, ENCHANT, TRIM, APPLY, CANCEL }
@@ -177,14 +319,25 @@ public final class CustomizePage extends GuiScreen {
     protected void renderChrome(StaticPane chrome) {
         for (HubButton button : hubButtons(session)) {
             GuiClick action = handler(button.action());
-            chrome.addItem(wrap(buttonItem(button), (p, e) -> {
+            chrome.addItem(clickable(buttonItem(button), (p, e) -> {
                 if (writePending && (button.action() == Action.RENAME || button.action() == Action.APPLY)) {
                     return;
                 }
                 SoundManager.playClick(p);
                 action.on(p, e);
-            }, player), button.column(), HUB_ROW);
+            }), button.column(), HUB_ROW);
         }
+    }
+
+    /**
+     * Explicit plugin owner instead of InventoryFramework's classloader lookup: the jar is
+     * relocated into this plugin, but standalone tests load IF from the test classpath.
+     */
+    private GuiItem clickable(ItemStack item, GuiClick click) {
+        return new GuiItem(item, event -> {
+            Player clicker = event.getWhoClicked() instanceof Player p ? p : player;
+            click.on(clicker, event);
+        }, gui.plugin());
     }
 
     // ------------------------------------------------------------------ actions

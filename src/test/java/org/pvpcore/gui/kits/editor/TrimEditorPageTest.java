@@ -52,15 +52,15 @@ class TrimEditorPageTest {
     }
 
     @Test
-    void pageUsesThreeRowsAndTwentyOneEntrySlots() throws Exception {
+    void pageUsesThreeRowsAndEighteenEntrySlots() throws Exception {
         TrimEditorPage page = page(session(Material.DIAMOND_HELMET, 4), 4, 1);
         assertNotNull(page);
         assertEquals(3, page.rows());
         assertEquals(27, page.topSize());
-        assertEquals(21, TrimEditorPage.ENTRIES_PER_PAGE);
-        assertEquals(21, TrimEditorPage.entrySlots().size());
+        assertEquals(18, TrimEditorPage.ENTRIES_PER_PAGE);
+        assertEquals(18, TrimEditorPage.entrySlots().size());
         assertEquals(0, TrimEditorPage.entrySlots().get(0));
-        assertEquals(20, TrimEditorPage.entrySlots().get(20));
+        assertEquals(17, TrimEditorPage.entrySlots().get(17));
     }
 
     @Test
