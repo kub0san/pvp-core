@@ -7,8 +7,11 @@ import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.inventory.InventoryCloseEvent;
+import org.bukkit.event.inventory.InventoryDragEvent;
 import org.bukkit.event.player.PlayerDropItemEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
+import org.bukkit.inventory.Inventory;
+import org.bukkit.inventory.InventoryView;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.PlayerInventory;
 import org.pvpcore.gui.kits.GUI;
@@ -53,9 +56,39 @@ public final class KitEditorDropGuard implements Listener {
             return;
         }
         ItemStack cursor = event.getCursor();
-        if (EditorHintLore.has(cursor)) {
-            EditorHintLore.strip(cursor);
-            event.getView().setCursor(cursor);
+        EditorHintLore.strip(cursor);
+        event.getView().setCursor(cursor);
+    }
+
+    /**
+     * MONITOR runs after the drag has been applied, so display clones dropped into any slot are
+     * cleaned before the player can pick them up and carry them out of the editor.
+     */
+    @EventHandler(priority = EventPriority.MONITOR)
+    public void onDrag(InventoryDragEvent event) {
+        if (!(event.getWhoClicked() instanceof Player player)) {
+            return;
+        }
+        if (GUI.peekEditorContext(player) == null) {
+            return;
+        }
+        InventoryView view = event.getView();
+        ItemStack cursor = event.getCursor();
+        EditorHintLore.strip(cursor);
+        view.setCursor(cursor);
+
+        for (int raw : event.getRawSlots()) {
+            Inventory inventory = view.getInventory(raw);
+            if (inventory == null) {
+                continue;
+            }
+            int slot = view.convertSlot(raw);
+            if (slot < 0 || slot >= inventory.getSize()) {
+                continue;
+            }
+            ItemStack item = inventory.getItem(slot);
+            EditorHintLore.strip(item);
+            inventory.setItem(slot, item);
         }
     }
 
@@ -88,25 +121,19 @@ public final class KitEditorDropGuard implements Listener {
     /** Strips marked items on the cursor, in the inventory and in the offhand slot. */
     private static void stripCarriedHints(Player player) {
         ItemStack cursor = player.getItemOnCursor();
-        if (EditorHintLore.has(cursor)) {
-            EditorHintLore.strip(cursor);
-            player.setItemOnCursor(cursor);
-        }
+        EditorHintLore.strip(cursor);
+        player.setItemOnCursor(cursor);
 
         PlayerInventory inventory = player.getInventory();
         ItemStack[] contents = inventory.getContents();
         for (int i = 0; i < contents.length; i++) {
             ItemStack item = contents[i];
-            if (EditorHintLore.has(item)) {
-                EditorHintLore.strip(item);
-                inventory.setItem(i, item);
-            }
+            EditorHintLore.strip(item);
+            inventory.setItem(i, item);
         }
 
         ItemStack offhand = inventory.getItemInOffHand();
-        if (EditorHintLore.has(offhand)) {
-            EditorHintLore.strip(offhand);
-            inventory.setItemInOffHand(offhand);
-        }
+        EditorHintLore.strip(offhand);
+        inventory.setItemInOffHand(offhand);
     }
 }

@@ -22,6 +22,8 @@ import java.util.List;
  */
 public final class EditorHintLore {
     private static final NamespacedKey MARKER = new NamespacedKey("pvp-core", "editor_hint");
+    private static final NamespacedKey LINE_COUNT =
+            new NamespacedKey("pvp-core", "editor_hint_lines");
     private static final MiniMessage MINI_MESSAGE = MiniMessage.miniMessage();
 
     /** The only lore lines this helper may add or remove. */
@@ -47,6 +49,7 @@ public final class EditorHintLore {
             return item;
         }
         data.set(MARKER, PersistentDataType.BYTE, (byte) 1);
+        data.set(LINE_COUNT, PersistentDataType.INTEGER, HINT_LINES.size());
         List<Component> withHints = new ArrayList<>();
         List<Component> existing = meta.lore();
         if (existing != null) {
@@ -59,8 +62,10 @@ public final class EditorHintLore {
     }
 
     /**
-     * Removes the marker and exactly the hint lines from {@code item} in place. Unmarked items,
-     * including player-authored lore that merely looks like a hint, are left untouched.
+     * Removes the marker and exactly the trailing lines this helper appended from {@code item}
+     * in place. Unmarked items, including player-authored lore that merely looks like a hint,
+     * are left untouched. The recorded count keeps player-authored lookalikes elsewhere in the
+     * lore intact.
      */
     public static void strip(ItemStack item) {
         if (item == null || item.getType().isAir()) {
@@ -74,10 +79,14 @@ public final class EditorHintLore {
         if (!data.has(MARKER, PersistentDataType.BYTE)) {
             return;
         }
+        Integer recorded = data.get(LINE_COUNT, PersistentDataType.INTEGER);
+        // Items marked before the count existed always received the full hint block.
+        int count = recorded == null ? HINT_LINES.size() : recorded;
         data.remove(MARKER);
+        data.remove(LINE_COUNT);
         List<Component> lore = meta.lore();
-        if (lore != null) {
-            List<Component> kept = lore.stream().filter(line -> !HINT_LINES.contains(line)).toList();
+        if (lore != null && count > 0 && lore.size() >= count) {
+            List<Component> kept = new ArrayList<>(lore.subList(0, lore.size() - count));
             meta.lore(kept.isEmpty() ? null : kept);
         }
         item.setItemMeta(meta);

@@ -157,10 +157,18 @@ public final class CustomizePage extends GuiScreen {
 
     private GuiClick handler(Action action) {
         return switch (action) {
-            case RENAME -> (p, e) -> openRename(p);
+            // A queued save owns the pending operation; renaming or applying again would
+            // overwrite it before the outcome callback can resolve it.
+            case RENAME -> (p, e) -> {
+                if (writePending) return;
+                openRename(p);
+            };
             case ENCHANT -> (p, e) -> openEnchantments(p);
             case TRIM -> (p, e) -> openTrims(p);
-            case APPLY -> (p, e) -> apply(p);
+            case APPLY -> (p, e) -> {
+                if (writePending) return;
+                apply(p);
+            };
             case CANCEL -> (p, e) -> cancel(p);
         };
     }
@@ -170,6 +178,9 @@ public final class CustomizePage extends GuiScreen {
         for (HubButton button : hubButtons(session)) {
             GuiClick action = handler(button.action());
             chrome.addItem(wrap(buttonItem(button), (p, e) -> {
+                if (writePending && (button.action() == Action.RENAME || button.action() == Action.APPLY)) {
+                    return;
+                }
                 SoundManager.playClick(p);
                 action.on(p, e);
             }, player), button.column(), HUB_ROW);
@@ -179,6 +190,9 @@ public final class CustomizePage extends GuiScreen {
     // ------------------------------------------------------------------ actions
 
     private void openRename(Player p) {
+        if (writePending || chatPending) {
+            return;
+        }
         if (!rulesOf(gui).enabled()) {
             send(gui, p, "error.cosmetics-disabled");
             return;
