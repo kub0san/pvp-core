@@ -24,13 +24,13 @@ public class KitMenuCloseListener implements Listener {
     @EventHandler
     public void onEditorClose(InventoryCloseEvent e) {
         Inventory inv = e.getInventory();
-        if (inv.getSize() != 54 || inv.getLocation() != null) {
+        if (inv.getLocation() != null) {
             return;
         }
 
         Player player = (Player) e.getPlayer();
         GUI.EditorContext context = GUI.getAndRemoveEditorContext(player.getUniqueId());
-        if (context == null) {
+        if (context == null || inv.getSize() != context.type().topSize()) {
             return;
         }
 

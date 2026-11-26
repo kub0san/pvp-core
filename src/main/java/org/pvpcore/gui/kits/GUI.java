@@ -77,7 +77,28 @@ public class GUI implements GuiSession {
         PUBLIC_KIT,
         ENDERCHEST,
         INSPECT_KIT,
-        INSPECT_ENDERCHEST
+        INSPECT_ENDERCHEST;
+
+        /** True for the compact ender-chest variants. */
+        public boolean enderchest() {
+            return this == ENDERCHEST || this == INSPECT_ENDERCHEST;
+        }
+
+        /** Top-inventory size this editor must have before its contents may be saved. */
+        public int topSize() {
+            return (enderchest() ? GuiLayouts.ROWS_EDITOR_EC : GuiLayouts.ROWS_EDITOR_KIT)
+                    * GuiLayouts.COLUMNS;
+        }
+
+        /** First editable content slot of this editor. */
+        public int contentStart() {
+            return enderchest() ? GuiLayouts.EC_CONTENT_START : GuiLayouts.KIT_CONTENT_START;
+        }
+
+        /** Exclusive end of the editable content range of this editor. */
+        public int contentEnd() {
+            return enderchest() ? GuiLayouts.EC_CONTENT_END : GuiLayouts.KIT_CONTENT_END;
+        }
     }
 
     public record EditorContext(EditorType type, int slot, String id, UUID target, String playerName) {
@@ -221,7 +242,7 @@ public class GUI implements GuiSession {
             return;
         }
         Inventory top = p.getOpenInventory().getTopInventory();
-        if (top.getSize() == GuiLayouts.MENU_SIZE && top.getLocation() == null) {
+        if (top.getSize() == context.type().topSize() && top.getLocation() == null) {
             EditorSaver.save(kits, p, context, top);
         }
     }

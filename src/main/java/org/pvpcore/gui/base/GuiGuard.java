@@ -3,9 +3,11 @@ package org.pvpcore.gui.base;
 import com.github.stefvanschie.inventoryframework.gui.type.ChestGui;
 import org.bukkit.entity.Player;
 import org.bukkit.event.inventory.InventoryAction;
+import org.bukkit.event.inventory.InventoryClickEvent;
 import org.pvpcore.commands.kits.core.ActionGuards;
 import org.pvpcore.util.kits.LocationFeature;
 
+import java.util.function.Consumer;
 import java.util.function.IntPredicate;
 
 /**
@@ -93,6 +95,15 @@ public final class GuiGuard {
      */
     public static void takeOnly(ChestGui chest, String permission, LocationFeature feature,
                                 IntPredicate takeableSlot) {
+        takeOnly(chest, permission, feature, takeableSlot, GuiLayouts.MENU_SIZE);
+    }
+
+    /**
+     * Same contract as the six-row {@link #takeOnly(ChestGui, String, LocationFeature, IntPredicate)},
+     * for screens with a different top-inventory size.
+     */
+    public static void takeOnly(ChestGui chest, String permission, LocationFeature feature,
+                                IntPredicate takeableSlot, int topSize) {
         chest.setOnGlobalClick(event -> {
             if (!(event.getWhoClicked() instanceof Player clicker)) {
                 event.setCancelled(true);
@@ -110,12 +121,12 @@ public final class GuiGuard {
                 return;
             }
             // Shift-click from the player's inventory into the screen.
-            if (action == InventoryAction.MOVE_TO_OTHER_INVENTORY && raw >= GuiLayouts.MENU_SIZE) {
+            if (action == InventoryAction.MOVE_TO_OTHER_INVENTORY && raw >= topSize) {
                 event.setCancelled(true);
                 return;
             }
             // Any placement onto a screen slot: cursor, cursor-swap or number keys.
-            if (raw < GuiLayouts.MENU_SIZE) {
+            if (raw < topSize) {
                 switch (action) {
                     case PLACE_ALL, PLACE_ONE, PLACE_SOME, SWAP_WITH_CURSOR,
                          HOTBAR_SWAP, HOTBAR_MOVE_AND_READD -> event.setCancelled(true);
@@ -131,7 +142,7 @@ public final class GuiGuard {
         chest.setOnGlobalDrag(event -> {
             for (int raw : event.getRawSlots()) {
                 // Every drag into the screen is a placement, wherever it lands.
-                if (raw >= 0 && raw < GuiLayouts.MENU_SIZE) {
+                if (raw >= 0 && raw < topSize) {
                     event.setCancelled(true);
                     return;
                 }
@@ -162,6 +173,19 @@ public final class GuiGuard {
      */
     public static void editable(ChestGui chest, String permission, LocationFeature feature,
                                 IntPredicate editableSlot) {
+        editable(chest, permission, feature, editableSlot, GuiLayouts.MENU_SIZE, null, null);
+    }
+
+    /**
+     * Same contract as the six-row {@link #editable(ChestGui, String, LocationFeature, IntPredicate)},
+     * but derives the top inventory from {@code topSize} and composes two extra handlers after the
+     * built-in cancellations: {@code extraTop} receives top-inventory clicks and {@code extraGlobal}
+     * receives every click. A null handler is simply skipped.
+     */
+    public static void editable(ChestGui chest, String permission, LocationFeature feature,
+                                IntPredicate editableSlot, int topSize,
+                                Consumer<InventoryClickEvent> extraTop,
+                                 Consumer<InventoryClickEvent> extraGlobal) {
         chest.setOnGlobalClick(event -> {
             if (!(event.getWhoClicked() instanceof Player clicker)) {
                 event.setCancelled(true);
@@ -179,13 +203,19 @@ public final class GuiGuard {
                 return;
             }
             // Shift-click from the player's inventory: refuse, whatever the destination would be.
-            if (action == InventoryAction.MOVE_TO_OTHER_INVENTORY && event.getRawSlot() >= GuiLayouts.MENU_SIZE) {
+            if (action == InventoryAction.MOVE_TO_OTHER_INVENTORY && event.getRawSlot() >= topSize) {
                 event.setCancelled(true);
+            }
+            if (extraGlobal != null) {
+                extraGlobal.accept(event);
             }
         });
         chest.setOnTopClick(event -> {
             if (!editableSlot.test(event.getRawSlot())) {
                 event.setCancelled(true);
+            }
+            if (extraTop != null) {
+                extraTop.accept(event);
             }
         });
         chest.setOnGlobalDrag(event -> {
@@ -193,7 +223,7 @@ public final class GuiGuard {
                 // Only the slots of the screen itself are checked. A drag that
                 // starts in the player's own inventory is allowed, exactly as
                 // the old editor did it.
-                if (raw >= 0 && raw < GuiLayouts.MENU_SIZE && !editableSlot.test(raw)) {
+                if (raw >= 0 && raw < topSize && !editableSlot.test(raw)) {
                     event.setCancelled(true);
                     return;
                 }

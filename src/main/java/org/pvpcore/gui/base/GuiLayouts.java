@@ -40,9 +40,9 @@ public final class GuiLayouts {
     public static final int KIT_CONTENT_START = 0;
     public static final int KIT_CONTENT_END = KitContents.INVENTORY_SIZE; // 41, exclusive
 
-    /** Ender chest layout content: slots 9-35. */
-    public static final int EC_CONTENT_START = 9;
-    public static final int EC_CONTENT_END = EC_CONTENT_START + KitContents.ENDERCHEST_SIZE; // 36, exclusive
+    /** Ender chest layout content: slots 0-26, filling the compact four-row editor. */
+    public static final int EC_CONTENT_START = 0;
+    public static final int EC_CONTENT_END = EC_CONTENT_START + KitContents.ENDERCHEST_SIZE; // 27, exclusive
 
     /**
      * Kit layouts keep boots, leggings, chestplate, helmet and offhand in
@@ -77,7 +77,21 @@ public final class GuiLayouts {
 
     // ---- Total chest rows per screen type ----
     public static final int ROWS_CONFIRM = 4;
+    /** Legacy six-row editor (kit room editor, customize-family screens). */
     public static final int ROWS_EDITOR = 6;
+    /** Compact item editors: five rows for a kit, four for an ender chest. */
+    public static final int ROWS_EDITOR_KIT = 5;
+    public static final int ROWS_EDITOR_EC = 4;
+
+    /**
+     * Compact editor controls occupy the last row, immediately after the content.
+     * The kit editor keeps its armor in row 4, so controls start at column 5;
+     * the ender chest editor's whole last row is free.
+     */
+    public static final int EDITOR_KIT_CONTROL_START = KIT_CONTENT_END; // 41
+    public static final int EDITOR_EC_CONTROL_START = EC_CONTENT_END; // 27
+    public static final int EDITOR_KIT_BACK_SLOT = ROWS_EDITOR_KIT * COLUMNS - 1; // 44
+    public static final int EDITOR_EC_BACK_SLOT = EDITOR_EC_CONTROL_START + 3; // 30
 
     // ---- Kit cosmetics customize screen ----
     public static final int EDITOR_CUSTOMIZE_SLOT = 41;

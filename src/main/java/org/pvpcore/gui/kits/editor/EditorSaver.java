@@ -25,7 +25,6 @@ import org.pvpcore.features.kits.KitContents;
 import org.pvpcore.features.kits.KitManager;
 import org.pvpcore.features.kits.KitsContext;
 import org.pvpcore.commands.kits.core.ActionGuards;
-import org.pvpcore.gui.base.GuiLayouts;
 import org.pvpcore.util.kits.Lang;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.Inventory;
@@ -37,12 +36,11 @@ import java.util.UUID;
 /**
  * Saves editors on close and on canvas redraw navigation, which does not fire a close event.
  *
- * <p>Only valid for the 6-row editors, whose content ends at
- * {@link org.pvpcore.gui.base.GuiLayouts#MENU_SIZE}: the whole 54-slot
- * inventory is read, and the copy range is derived from the editor type. A
- * screen with a different shape -- the kit-room item editor, for instance,
- * whose content stops at slot 44 -- must not be saved through here; it has its
- * own save handler.</p>
+ * <p>Only valid for the compact editors: the top inventory must have exactly
+ * the size declared by {@link GUI.EditorType#topSize()} (45 slots for a kit,
+ * 36 for an ender chest), and the copy range is derived from the same type. A
+ * screen with a different shape -- the kit-room item editor, for instance -- must
+ * not be saved through here; it has its own save handler.</p>
  */
 public final class EditorSaver {
     private EditorSaver() {}
@@ -62,24 +60,28 @@ public final class EditorSaver {
         };
         if (!ActionGuards.allowed(player, permission)) return;
         ItemStack[] view = inventory.getContents();
-        if (view == null || view.length != GuiLayouts.MENU_SIZE) return;
+        if (view == null || view.length != context.type().topSize()) return;
 
         switch (context.type()) {
-            case KIT, ENDERCHEST -> savePersonal(kitsCtx, player, context.slot(), view, context.type() == GUI.EditorType.ENDERCHEST, cleared);
-            case PUBLIC_KIT -> savePublicKit(kitsCtx, player, context.id(), view);
+            case KIT, ENDERCHEST -> savePersonal(kitsCtx, player, context, view, cleared);
+            case PUBLIC_KIT -> savePublicKit(kitsCtx, player, context.id(), context.type(), view);
             case INSPECT_KIT, INSPECT_ENDERCHEST -> saveInspection(kitsCtx, player, context, view);
         }
     }
 
-    private static ItemStack[] editableContents(ItemStack[] view, boolean enderchest) {
-        return KitContents.copyRange(view, enderchest ? GuiLayouts.EC_CONTENT_START : 0,
-                enderchest ? KitContents.ENDERCHEST_SIZE : KitContents.INVENTORY_SIZE);
+    static ItemStack[] editableContents(ItemStack[] view, GUI.EditorType type) {
+        int start = type.contentStart();
+        int end = type.contentEnd();
+        return KitContents.copyRange(view, start, end - start);
     }
 
-    private static void savePersonal(KitsContext kitsCtx, Player player, int slot, ItemStack[] view, boolean enderchest, boolean cleared) {
+    private static void savePersonal(KitsContext kitsCtx, Player player, GUI.EditorContext context,
+                                     ItemStack[] view, boolean cleared) {
+        boolean enderchest = context.type().enderchest();
+        int slot = context.slot();
         KitManager kitManager = kitsCtx.kitManager();
         UUID uuid = player.getUniqueId();
-        ItemStack[] items = editableContents(view, enderchest);
+        ItemStack[] items = editableContents(view, context.type());
         ItemStack[] stored = enderchest ? kitManager.getPlayerEC(uuid, slot) : kitManager.getPlayerKit(uuid, slot);
         if (!cleared && Arrays.equals(items, kitsCtx.itemFilter().filterItemStack(stored))) return;
         if (KitContents.isEmpty(items)) {
@@ -93,17 +95,18 @@ public final class EditorSaver {
         else kitManager.savekit(uuid, slot, items);
     }
 
-    private static void savePublicKit(KitsContext kitsCtx, Player player, String id, ItemStack[] view) {
+    private static void savePublicKit(KitsContext kitsCtx, Player player, String id,
+                                      GUI.EditorType type, ItemStack[] view) {
         if (id == null || id.isEmpty()) return;
         KitManager kitManager = kitsCtx.kitManager();
-        ItemStack[] items = editableContents(view, false);
+        ItemStack[] items = editableContents(view, type);
         if (KitContents.isEmpty(items)) kitManager.deletePublicKit(id);
         else if (!Arrays.equals(items, kitManager.getPublicKit(id))) kitManager.savePublicKit(player, id, items);
     }
 
     private static void saveInspection(KitsContext kitsCtx, Player player, GUI.EditorContext context, ItemStack[] view) {
-        boolean enderchest = context.type() == GUI.EditorType.INSPECT_ENDERCHEST;
-        ItemStack[] items = editableContents(view, enderchest);
+        boolean enderchest = context.type().enderchest();
+        ItemStack[] items = editableContents(view, context.type());
         KitManager kitManager = kitsCtx.kitManager();
         ItemStack[] stored = enderchest ? kitManager.getPlayerEC(context.target(), context.slot()) : kitManager.getPlayerKit(context.target(), context.slot());
         if (Arrays.equals(items, stored)) return;

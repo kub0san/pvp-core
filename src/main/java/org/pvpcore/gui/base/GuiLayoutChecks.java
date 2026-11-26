@@ -38,6 +38,7 @@ public final class GuiLayoutChecks {
     /** Called once from {@code PvPCorePlugin#onEnable}. */
     public static void verify() {
         checkEditorRows();
+        checkCompactEditorRows();
         checkKitRoomRows();
         checkPreviewRows();
         checkRowCounts();
@@ -79,11 +80,8 @@ public final class GuiLayoutChecks {
         assertEqual("KIT_CONTENT_START", GuiLayouts.KIT_CONTENT_START, 0);
         assertEqual("KIT_CONTENT_END", GuiLayouts.KIT_CONTENT_END, GuiLayouts.EDITOR_ARMOR_SLOT_END);
 
-        // The ender-chest content is rows 1-3: row 0 is the top frame and
-        // row 4 is the divider.
-        assertEqual("EC_CONTENT_START", GuiLayouts.EC_CONTENT_START, GuiLayouts.COLUMNS);
-        assertEqual("EC_CONTENT_END", GuiLayouts.EC_CONTENT_END,
-                GuiLayouts.EDITOR_DIVIDER_ROW * GuiLayouts.COLUMNS);
+        // The ender-chest content and controls belong to the compact editor;
+        // their full contract is checked by checkCompactEditorRows().
 
         // The editor footer contract must live inside the footer row.
         int[] contract = {
@@ -102,6 +100,42 @@ public final class GuiLayoutChecks {
         }
         assertDistinctAscending("editor footer contract", contract);
         assertEqual("EDITOR_LABEL_START", GuiLayouts.EDITOR_LABEL_START, GuiLayouts.FOOTER_START);
+    }
+
+    /**
+     * Compact item editors are full-canvas screens: their content is written straight
+     * into the inventory and their controls follow it in the last row. Content and
+     * controls must not overlap, and both must fit the editor's row count.
+     */
+    private static void checkCompactEditorRows() {
+        assertEqual("ROWS_EDITOR_KIT", GuiLayouts.ROWS_EDITOR_KIT, 5);
+        assertEqual("ROWS_EDITOR_EC", GuiLayouts.ROWS_EDITOR_EC, 4);
+
+        int kitLastRowStart = (GuiLayouts.ROWS_EDITOR_KIT - 1) * GuiLayouts.COLUMNS;
+        int ecLastRowStart = (GuiLayouts.ROWS_EDITOR_EC - 1) * GuiLayouts.COLUMNS;
+
+        assertEqual("KIT_CONTENT_START", GuiLayouts.KIT_CONTENT_START, 0);
+        assertEqual("KIT_CONTENT_END", GuiLayouts.KIT_CONTENT_END, GuiLayouts.EDITOR_ARMOR_SLOT_END);
+        assertEqual("EDITOR_KIT_CONTROL_START", GuiLayouts.EDITOR_KIT_CONTROL_START, GuiLayouts.KIT_CONTENT_END);
+        assertEqual("EDITOR_KIT_CONTROL_START (column)", GuiLayouts.EDITOR_KIT_CONTROL_START,
+                kitLastRowStart + GuiLayouts.EDITOR_DIVIDER_FIRST_COL);
+        assertEqual("EDITOR_KIT_BACK_SLOT", GuiLayouts.EDITOR_KIT_BACK_SLOT,
+                GuiLayouts.ROWS_EDITOR_KIT * GuiLayouts.COLUMNS - 1);
+
+        assertEqual("EC_CONTENT_START", GuiLayouts.EC_CONTENT_START, 0);
+        assertEqual("EC_CONTENT_END", GuiLayouts.EC_CONTENT_END, ecLastRowStart);
+        assertEqual("EDITOR_EC_CONTROL_START", GuiLayouts.EDITOR_EC_CONTROL_START, GuiLayouts.EC_CONTENT_END);
+        assertEqual("EDITOR_EC_CONTROL_START (row)", GuiLayouts.EDITOR_EC_CONTROL_START, ecLastRowStart);
+        assertEqual("EDITOR_EC_BACK_SLOT", GuiLayouts.EDITOR_EC_BACK_SLOT,
+                GuiLayouts.EDITOR_EC_CONTROL_START + 3);
+        if (GuiLayouts.EDITOR_EC_BACK_SLOT >= GuiLayouts.ROWS_EDITOR_EC * GuiLayouts.COLUMNS) {
+            throw new IllegalStateException("EDITOR_EC_BACK_SLOT is outside the EC editor");
+        }
+
+        if (GuiLayouts.KIT_CONTENT_END > GuiLayouts.EDITOR_KIT_CONTROL_START
+                || GuiLayouts.EC_CONTENT_END > GuiLayouts.EDITOR_EC_CONTROL_START) {
+            throw new IllegalStateException("Editor content overlaps its controls");
+        }
     }
 
     private static void checkKitRoomRows() {
