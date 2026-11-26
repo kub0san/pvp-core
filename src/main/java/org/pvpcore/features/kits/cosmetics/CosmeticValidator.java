@@ -1,7 +1,5 @@
 package org.pvpcore.features.kits.cosmetics;
 
-import io.papermc.paper.datacomponent.DataComponentTypes;
-import io.papermc.paper.datacomponent.item.BannerPatternLayers;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.minimessage.Context;
 import net.kyori.adventure.text.minimessage.MiniMessage;
@@ -11,14 +9,11 @@ import net.kyori.adventure.text.minimessage.tag.resolver.TagResolver;
 import net.kyori.adventure.text.minimessage.tag.standard.StandardTags;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ArmorMeta;
-import org.bukkit.inventory.meta.BannerMeta;
-import org.bukkit.inventory.meta.ItemMeta;
-import org.bukkit.inventory.meta.ShieldMeta;
 import org.pvpcore.config.kits.CustomizeRules;
 
 import java.util.Objects;
 
-/** Validation for cosmetic inputs: item types, strict name tags and banner readability. */
+/** Validation for cosmetic inputs: item types and strict name tags. */
 public final class CosmeticValidator {
     /** Distinguishes a rejected formatting tag from other malformed names at the call site. */
     public static final class BlockedTagException extends IllegalArgumentException {
@@ -95,32 +90,5 @@ public final class CosmeticValidator {
 
     public boolean isArmor(ItemStack item) {
         return item != null && item.getItemMeta() instanceof ArmorMeta;
-    }
-
-    public boolean isShield(ItemStack item) {
-        return item != null && item.getItemMeta() instanceof ShieldMeta;
-    }
-
-    /**
-     * True when the raw {@code BannerPatternLayers} component holds more layers than
-     * Bukkit can expose via {@link BannerMeta#getPatterns()}. Any failure to read either
-     * side is treated as unsafe so callers fail closed instead of silently stripping data.
-     */
-    public boolean hasUnreadableBannerLayers(ItemStack item) {
-        if (item == null) return true;
-        try {
-            BannerPatternLayers raw = item.getData(DataComponentTypes.BANNER_PATTERNS);
-            int rawLayers = raw == null ? 0 : raw.patterns().size();
-            ItemMeta meta = item.getItemMeta();
-            int readableLayers = meta instanceof BannerMeta banner ? banner.getPatterns().size() : 0;
-            return unreadableLayerCount(rawLayers, readableLayers) > 0;
-        } catch (RuntimeException e) {
-            return true;
-        }
-    }
-
-    /** Pure helper: how many raw layers Bukkit cannot represent. */
-    public int unreadableLayerCount(int rawLayers, int readableLayers) {
-        return Math.max(0, rawLayers - readableLayers);
     }
 }

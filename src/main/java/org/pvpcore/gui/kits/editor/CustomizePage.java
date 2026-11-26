@@ -257,13 +257,6 @@ public final class CustomizePage extends GuiScreen {
             send(gui, p, "error.cosmetics-kit-changed");
             return;
         }
-        CosmeticValidator validator = new CosmeticValidator(rules);
-        for (ItemStack item : session.working()) {
-            if (validator.isShield(item) && validator.hasUnreadableBannerLayers(item)) {
-                send(gui, p, "error.cosmetics-banner-locked");
-                return;
-            }
-        }
         // Register without clearing a reload stale marker, then commit through the
         // outcome overload so the queued write can report back after close/quit.
         UUID operationId = gui.holdPendingCustomize(viewer, session);

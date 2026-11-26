@@ -107,23 +107,9 @@ public final class GuiLayouts {
     public static final int RENAME_TARGET_LAST = 40;
     public static final int RENAME_BACK_SLOT = 53;
 
-    // ---- Banner designer ----
-    public static final int BANNER_TEMPLATE_SLOT = 0;
-    public static final int BANNER_PREVIEW_SLOT = 8;
-    public static final int BANNER_BASE_SLOT = 9;
-    public static final int BANNER_LAYERS_FIRST = 10;
-    public static final int BANNER_LAYERS_LAST = 36;
-    public static final int BANNER_ADD_SLOT = 37;
-    public static final int BANNER_REMOVE_SLOT = 38;
-    public static final int BANNER_UP_SLOT = 39;
-    public static final int BANNER_DOWN_SLOT = 40;
-    public static final int BANNER_BLANK_SLOT = 43;
-    public static final int BANNER_REVERT_SLOT = 44;
-    public static final int BANNER_BACK_SLOT = 45;
-    public static final int BANNER_APPLY_SLOT = 53;
+    // ---- Public kit preview (5 rows, full canvas) ----
     public static final int ROWS_PREVIEW = 5;
 
-    // ---- Public kit preview (5 rows, full canvas) ----
     /**
      * Row 4 of the preview: cols 0-4 hold the kit's armor (written straight
      * into the inventory), cols 5-6 are the only free cells and hold the

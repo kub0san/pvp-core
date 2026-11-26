@@ -3,12 +3,9 @@ package org.pvpcore.features.kits.cosmetics;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
-import org.bukkit.DyeColor;
 import org.bukkit.Material;
-import org.bukkit.block.banner.PatternType;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ArmorMeta;
-import org.bukkit.inventory.meta.ShieldMeta;
 import org.bukkit.inventory.meta.trim.ArmorTrim;
 import org.bukkit.inventory.meta.trim.TrimMaterial;
 import org.bukkit.inventory.meta.trim.TrimPattern;
@@ -71,40 +68,6 @@ class CosmeticApplierTest {
                 () -> applier.applyTrim(new ItemStack(Material.SHIELD), TrimMaterial.DIAMOND, TrimPattern.COAST));
         assertThrows(IllegalArgumentException.class,
                 () -> applier.removeTrim(new ItemStack(Material.SHIELD)));
-    }
-
-    @Test
-    void bannerOnChestplateIsRejected() {
-        assertThrows(IllegalArgumentException.class,
-                () -> applier.applyBanner(new ItemStack(Material.DIAMOND_CHESTPLATE), BannerDesign.blank()));
-    }
-
-    @Test
-    void noOpBannerDoesNotAddBaseColour() {
-        ItemStack shield = new ItemStack(Material.SHIELD);
-        BannerDesign design = BannerDesign.from(shield);
-
-        ItemStack applied = applier.applyBanner(shield, design);
-
-        assertNotSame(shield, applied);
-        ShieldMeta meta = (ShieldMeta) applied.getItemMeta();
-        assertNull(meta.getBaseColor());
-        assertTrue(meta.getPatterns().isEmpty());
-    }
-
-    @Test
-    void applyBannerWritesDesign() {
-        ItemStack shield = new ItemStack(Material.SHIELD);
-        BannerDesign design = BannerDesign.from(shield)
-                .withBaseColor(DyeColor.RED)
-                .addLayer(new BannerDesign.Layer(DyeColor.BLUE, PatternType.SKULL), 6);
-
-        ItemStack applied = applier.applyBanner(shield, design);
-
-        ShieldMeta meta = (ShieldMeta) applied.getItemMeta();
-        assertEquals(DyeColor.RED, meta.getBaseColor());
-        assertEquals(1, meta.getPatterns().size());
-        assertNull(((ShieldMeta) shield.getItemMeta()).getBaseColor());
     }
 
     @Test

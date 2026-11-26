@@ -55,7 +55,6 @@ public final class CustomizeService {
     private final GuardChecker guard;
     private final CurrentKitReader reader;
     private final StaleChecker stale;
-    private final CosmeticValidator validator;
     private final Logger logger = Logger.getLogger(CustomizeService.class.getName());
 
     /** Test seam constructor: no reload invalidation unless a stale checker is supplied. */
@@ -70,7 +69,6 @@ public final class CustomizeService {
         this.guard = Objects.requireNonNull(guard, "guard");
         this.reader = Objects.requireNonNull(reader, "reader");
         this.stale = Objects.requireNonNull(stale, "stale");
-        this.validator = new CosmeticValidator(rules);
     }
 
     /** Production wiring; call at Apply time so every dependency reflects the live context. */
@@ -119,13 +117,9 @@ public final class CustomizeService {
     }
 
     private boolean validContent(ItemStack[] kit) {
-        if (!rules.enabled() || kit == null || kit.length == 0) return false;
-        for (ItemStack item : kit) {
-            // An unreadable banner layer would be silently stripped by a later meta round-trip.
-            // Only shields are cosmetic banner targets; unrelated banners must not block Apply.
-            if (item != null && validator.isShield(item) && validator.hasUnreadableBannerLayers(item)) return false;
-        }
-        return true;
+        // Kit contents are opaque here: no cosmetic validation may rewrite a saved item's
+        // metadata (in particular, shield banner layers must survive a save untouched).
+        return rules.enabled() && kit != null && kit.length > 0;
     }
 
     private void observeWrite(Player player, CompletableFuture<Void> write, Consumer<Boolean> outcome) {

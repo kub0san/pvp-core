@@ -6,7 +6,6 @@ import org.bukkit.NamespacedKey;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ArmorMeta;
 import org.bukkit.inventory.meta.ItemMeta;
-import org.bukkit.inventory.meta.ShieldMeta;
 import org.bukkit.inventory.meta.trim.ArmorTrim;
 import org.bukkit.inventory.meta.trim.TrimMaterial;
 import org.bukkit.inventory.meta.trim.TrimPattern;
@@ -55,23 +54,6 @@ public final class CosmeticApplier {
         armor.setTrim(null);
         result.setItemMeta(armor);
         return result;
-    }
-
-    public ItemStack applyBanner(ItemStack item, BannerDesign design) {
-        Objects.requireNonNull(item, "item");
-        Objects.requireNonNull(design, "design");
-        if (!(item.getItemMeta() instanceof ShieldMeta)) {
-            throw new IllegalArgumentException("Banner target must be a shield");
-        }
-        if (validator.hasUnreadableBannerLayers(item)) {
-            throw new IllegalArgumentException("Shield has unreadable banner layers");
-        }
-        for (BannerDesign.Layer layer : design.layers()) {
-            if (!allows(keyOf(layer.pattern()), rules::allowsBannerPattern)) {
-                throw new IllegalArgumentException("Banner pattern is not allowed");
-            }
-        }
-        return design.applyTo(item);
     }
 
     public ItemStack applyName(ItemStack item, String raw) {

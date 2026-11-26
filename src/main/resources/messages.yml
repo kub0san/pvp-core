@@ -189,10 +189,8 @@ pvpcore: # Renamed from 'kits'
     autosetup-reset-console-only: "<red>Resetting the kit room can only be done from the server console.</red>"
     cosmetics-disabled: "<red>Kit customizing is disabled on this server.</red>"
     cosmetics-not-armor: "<red>That item is not armor and cannot have a trim.</red>"
-    cosmetics-not-shield: "<red>Put a shield in your kit's offhand slot first.</red>"
     cosmetics-name-invalid: "<red>That name is invalid or too long.</red>"
     cosmetics-name-tag-blocked: "<red>That name uses formatting tags that are not allowed here.</red>"
-    cosmetics-banner-locked: "<red>This shield has banner layers that cannot be read; editing is locked.</red>"
     cosmetics-kit-changed: "<red>Your kit changed while the customize screen was open. Reopen it to try again.</red>"
     cosmetics-save-failed: "<red>Your kit could not be saved. No changes were applied.</red>"
     cosmetics-save-unconfirmed: "<red>Save not confirmed - your changes are kept and will be retried.</red>"
@@ -362,7 +360,6 @@ pvpcore: # Renamed from 'kits'
     enchant-level: "<gray>Level <white>{level}</white> / {max}</gray>"
     enchant-added: "<green>Enchantments updated.</green>"
     enchant-removed: "<green>Enchantment removed.</green>"
-    banner-designer-title: "<dark_aqua>Shield Banner Designer</dark_aqua>"
     rename-target-title: "<dark_aqua>Select an item to rename</dark_aqua>"
 
     kit-slot-name: "<dark_aqua>Kit {slot}</dark_aqua>"

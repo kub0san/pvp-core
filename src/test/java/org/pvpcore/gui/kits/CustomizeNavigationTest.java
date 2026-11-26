@@ -48,7 +48,7 @@ class CustomizeNavigationTest {
     void tabSwitchKeepsStagedChangesBecauseIncomingScreenRegistersFirst() {
         CustomizeSession session = stagedSession();
         gui.registerCustomizeScreen(viewer); // CustomizePage
-        gui.registerCustomizeScreen(viewer); // Banner/Rename page opens before the old one closes
+        gui.registerCustomizeScreen(viewer); // New hub/page opens before the old one closes
 
         gui.unregisterCustomizeScreen(viewer); // old CustomizePage onClose
         assertEquals(1, gui.customizeScreenCount(viewer));
