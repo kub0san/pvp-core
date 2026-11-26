@@ -16,36 +16,36 @@ import java.util.UUID;
  * dependency keep working with the dual-event fallback.
  *
  * <p>{@code LOWEST} runs before Bukkit events are fired, so cancelling here stops both
- * the Paper event and any legacy rebroadcast of the same message.</p>
+ * the Paper event and any legacy rebroadcast of the same message. The registry is an
+ * instance field owned by the facade's active listener, never a mutable static.</p>
  */
 final class GuiChatPromptPacketListener extends SimplePacketListenerAbstract {
-    private static final PacketListenerRegistry REGISTRY = new PacketListenerRegistry();
-
     /** Injected by the facade; returns true when the chat packet must be cancelled. */
     @FunctionalInterface
     interface Interceptor {
         boolean consume(UUID playerId, String message);
     }
 
+    private final PacketListenerRegistry registry = new PacketListenerRegistry();
     private final Interceptor interceptor;
 
-    private GuiChatPromptPacketListener(Interceptor interceptor) {
+    GuiChatPromptPacketListener(Interceptor interceptor) {
         super(PacketListenerPriority.LOWEST);
         this.interceptor = interceptor;
     }
 
-    /** Registers the listener. Returns false when PacketEvents refused it. */
-    static boolean install(Interceptor interceptor) {
+    /** Registers this listener. Returns false when PacketEvents refused it. */
+    boolean install() {
         try {
-            return REGISTRY.register(new GuiChatPromptPacketListener(interceptor)) > 0;
+            return registry.register(this) > 0;
         } catch (Throwable unavailable) {
             return false;
         }
     }
 
-    /** Unregisters the listener; best-effort during shutdown. */
-    static int stop() {
-        return REGISTRY.stop();
+    /** Unregisters this listener; best-effort during shutdown. */
+    void stop() {
+        registry.stop();
     }
 
     @Override

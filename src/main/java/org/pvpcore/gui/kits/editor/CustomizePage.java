@@ -363,7 +363,7 @@ public final class CustomizePage extends GuiScreen {
         UUID operationId = gui.holdPendingCustomize(viewer, session);
         // The prompt closes this screen; keep its staged edits alive until the callback arrives.
         chatPending = true;
-        GuiChatPrompt.ask(gui.plugin(), p, "Type a new name (MiniMessage), or 'cancel'",
+        GuiChatPrompt.askRename(gui.plugin(), p,
                 text -> {
                     chatPending = false;
                     CustomizeSession taken = stageRename(gui, p, operationId, text);

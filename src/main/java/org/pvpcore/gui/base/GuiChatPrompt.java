@@ -32,7 +32,9 @@ import java.util.function.Consumer;
  * exist. Without a registered packet listener, LOWEST handlers on both the Paper and the
  * legacy chat event suppress delivery (including a renderer/view rebroadcast). The
  * PacketEvents class is only touched after {@link PacketEventsGate#ready()}, so this class
- * loads on servers where the optional dependency is absent.</p>
+ * loads on servers where the optional dependency is absent. Bukkit handlers are registered
+ * unconditionally (quit cleanup is needed on both paths); the fallback chat handlers are
+ * explicit no-ops while the packet path is active.</p>
  *
  * <p><strong>Do not call this from a screen that saves state on close</strong> -- an
  * editor, whose close handler consumes the editor context via
@@ -44,31 +46,44 @@ import java.util.function.Consumer;
 public final class GuiChatPrompt implements Listener {
     static final long TIMEOUT_TICKS = 20L * 60;
 
-    /** Private instruction wording for the item-name rename prompt. */
+    /** Exact private instruction emitted by {@link #askRename}. */
     static final String RENAME_INSTRUCTION =
             "Enter a new item name using MiniMessage. Type cancel to go back.";
-    private static final String LEGACY_RENAME_INSTRUCTION = "Type a new name (MiniMessage), or 'cancel'";
 
     private static final Map<UUID, Pending> PENDING = new ConcurrentHashMap<>();
-    private static Plugin plugin;
-    private static boolean registered;
-    private static Listener listener;
+    private static volatile GuiChatPrompt listener;
 
     /*
-     * The fields below belong to the active facade listener instance, not to the class,
-     * so a reload can drop an old engine (and its PacketEvents registration) atomically.
+     * Engine state belongs to the active facade listener instance, not to the class, so a
+     * reload can drop an old engine (and its PacketEvents registration) atomically.
      */
     private boolean packetAttempted;
-    private boolean packetInstalled;
+    private volatile boolean packetInstalled;
+    private GuiChatPromptPacketListener packetListener;
 
     /**
-     * owner + operationId identify one prompt; consumed guards exactly-once delivery.
-     * The engine identity prevents a listener orphaned by clear() from handling a prompt
-     * created by its replacement.
+     * One prompt. owner and operationId identify the operation; consumed guards
+     * exactly-once delivery. A scheduled callback requires this exact instance to still
+     * be the map entry, so clear() and a later ask() invalidate it independently of the
+     * owner plugin's enabled state.
      */
-    private record Pending(GuiChatPrompt engine, Plugin owner, UUID operationId,
-                           AtomicBoolean consumed, Consumer<String> onInput,
-                           Runnable onCancel, BukkitTask timeout) {
+    private static final class Pending {
+        final GuiChatPrompt engine;
+        final Plugin owner;
+        final UUID operationId;
+        final AtomicBoolean consumed = new AtomicBoolean();
+        final Consumer<String> onInput;
+        final Runnable onCancel;
+        volatile BukkitTask timeout;
+
+        Pending(GuiChatPrompt engine, Plugin owner, UUID operationId,
+                Consumer<String> onInput, Runnable onCancel) {
+            this.engine = engine;
+            this.owner = owner;
+            this.operationId = operationId;
+            this.onInput = onInput;
+            this.onCancel = onCancel;
+        }
     }
 
     private GuiChatPrompt() {
@@ -81,39 +96,51 @@ public final class GuiChatPrompt implements Listener {
      */
     public static void ask(Plugin owner, Player player, String instruction,
                            Consumer<String> onInput, Runnable onCancel) {
+        askInternal(owner, player, instruction, true, onInput, onCancel);
+    }
+
+    /**
+     * Item-name rename prompt. Emits exactly one private instruction line; callers should
+     * use this instead of passing instruction strings that could drift.
+     */
+    public static void askRename(Plugin owner, Player player,
+                                 Consumer<String> onInput, Runnable onCancel) {
+        askInternal(owner, player, RENAME_INSTRUCTION, false, onInput, onCancel);
+    }
+
+    private static void askInternal(Plugin owner, Player player, String instruction,
+                                    boolean showCancelHint,
+                                    Consumer<String> onInput, Runnable onCancel) {
         if (owner == null || player == null || onInput == null || onCancel == null) {
             return;
         }
-        plugin = owner;
         UUID id = player.getUniqueId();
         discard(id);
         GuiChatPrompt engine = ensureListeners(owner);
         player.closeInventory();
 
-        if (LEGACY_RENAME_INSTRUCTION.equals(instruction)) {
-            // Keep the caller's historical ask(...) shape while showing the agreed wording.
-            say(player, RENAME_INSTRUCTION);
-        } else {
+        if (showCancelHint) {
             say(player, GuiTheme.ACCENT + "<bold>\u270E " + GuiTheme.TEXT + instruction);
             say(player, GuiTheme.MUTED + "Type your answer in chat, or type " + GuiTheme.RED + "cancel"
                     + GuiTheme.MUTED + " to go back. " + GuiTheme.FAINT + "(1 minute)");
+        } else {
+            say(player, instruction);
         }
 
-        BukkitTask timeout = Bukkit.getScheduler().runTaskLater(owner, () -> {
-            Pending expired = PENDING.get(id);
-            if (expired == null || !expired.consumed().compareAndSet(false, true)) {
+        Pending pending = new Pending(engine, owner, UUID.randomUUID(), onInput, onCancel);
+        pending.timeout = Bukkit.getScheduler().runTaskLater(owner, () -> {
+            if (PENDING.get(id) != pending || !pending.consumed.compareAndSet(false, true)) {
                 return;
             }
-            PENDING.remove(id, expired);
-            Plugin expiredOwner = expired.owner();
-            if (expiredOwner == null || !expiredOwner.isEnabled()) {
+            PENDING.remove(id, pending);
+            Plugin promptOwner = pending.owner;
+            if (promptOwner == null || !promptOwner.isEnabled()) {
                 return;
             }
             say(player, GuiTheme.warn("Timed out, nothing was changed."));
-            expired.onCancel().run();
+            pending.onCancel.run();
         }, TIMEOUT_TICKS);
-        PENDING.put(id, new Pending(engine, owner, UUID.randomUUID(), new AtomicBoolean(),
-                onInput, onCancel, timeout));
+        PENDING.put(id, pending);
     }
 
     public static void say(Player player, String miniMessage) {
@@ -127,48 +154,54 @@ public final class GuiChatPrompt implements Listener {
 
     /** Drops every waiting prompt and forgets the registration so a reload can re-register. */
     public static void clear() {
-        PENDING.values().forEach(pending -> pending.timeout().cancel());
-        PENDING.clear();
-        if (listener != null) {
-            HandlerList.unregisterAll(listener);
-            if (listener instanceof GuiChatPrompt engine) {
-                engine.stopPacketListener();
+        PENDING.values().forEach(pending -> {
+            if (pending.timeout != null) {
+                pending.timeout.cancel();
             }
+        });
+        PENDING.clear();
+        GuiChatPrompt engine = listener;
+        if (engine != null) {
+            HandlerList.unregisterAll(engine);
+            engine.stopPacketListener();
             listener = null;
         }
-        registered = false;
-        plugin = null;
     }
 
     private static void discard(UUID id) {
         Pending old = PENDING.remove(id);
-        if (old != null) {
-            old.timeout().cancel();
+        if (old != null && old.timeout != null) {
+            old.timeout.cancel();
         }
     }
 
     private static GuiChatPrompt ensureListeners(Plugin owner) {
-        if (listener == null) {
-            listener = new GuiChatPrompt();
+        GuiChatPrompt engine = listener;
+        if (engine == null) {
+            engine = new GuiChatPrompt();
+            // Always registered: PlayerQuitEvent cleanup is required on the PE path too.
+            Bukkit.getPluginManager().registerEvents(engine, owner);
+            listener = engine;
         }
-        GuiChatPrompt engine = (GuiChatPrompt) listener;
         if (!engine.packetAttempted) {
             engine.packetAttempted = true;
             if (PacketEventsGate.ready()) {
                 // Only this branch resolves the PacketEvents listener class.
-                engine.packetInstalled = GuiChatPromptPacketListener.install(engine::submit);
+                GuiChatPromptPacketListener candidate =
+                        new GuiChatPromptPacketListener(engine::submit);
+                if (candidate.install()) {
+                    engine.packetListener = candidate;
+                    engine.packetInstalled = true;
+                }
             }
-        }
-        if (!engine.packetInstalled && !registered) {
-            Bukkit.getPluginManager().registerEvents(engine, owner);
-            registered = true;
         }
         return engine;
     }
 
     private void stopPacketListener() {
-        if (packetInstalled) {
-            GuiChatPromptPacketListener.stop();
+        if (packetListener != null) {
+            packetListener.stop();
+            packetListener = null;
         }
         packetInstalled = false;
         packetAttempted = false;
@@ -184,25 +217,38 @@ public final class GuiChatPrompt implements Listener {
         if (id == null || text == null || text.startsWith("/")) {
             return false;
         }
-        Plugin owner = plugin;
         Pending pending = PENDING.get(id);
-        if (owner == null || !owner.isEnabled() || pending == null
-                || pending.engine() != this || pending.owner() != owner) {
+        if (pending == null || pending.engine != this) {
+            return false;
+        }
+        // The prompt owns its scheduler: a later ask() must not change this owner.
+        Plugin owner = pending.owner;
+        if (owner == null || !owner.isEnabled()) {
             return false;
         }
         String answer = text.trim();
-        if (pending.consumed().compareAndSet(false, true)) {
-            pending.timeout().cancel();
+        if (pending.consumed.compareAndSet(false, true)) {
+            if (pending.timeout != null) {
+                pending.timeout.cancel();
+            }
             try {
                 Bukkit.getScheduler().runTask(owner, () -> {
+                    // Identity is the generation/operation check: clear(), reload or a
+                    // replacement prompt invalidates this callback even while owner is enabled.
+                    Pending current = PENDING.get(id);
+                    if (current != pending
+                            || !pending.operationId.equals(current.operationId)) {
+                        return;
+                    }
                     PENDING.remove(id, pending);
-                    if (!owner.isEnabled()) {
+                    Plugin promptOwner = pending.owner;
+                    if (promptOwner == null || !promptOwner.isEnabled()) {
                         return;
                     }
                     if ("cancel".equalsIgnoreCase(answer)) {
-                        pending.onCancel().run();
+                        pending.onCancel.run();
                     } else {
-                        pending.onInput().accept(answer);
+                        pending.onInput.accept(answer);
                     }
                 });
             } catch (IllegalStateException notSchedulable) {
@@ -213,8 +259,29 @@ public final class GuiChatPrompt implements Listener {
         return true;
     }
 
+    /**
+     * Package-private seams for unit tests: simulate the packet path and feed it chat
+     * without loading any PacketEvents class in MockBukkit.
+     */
+    static void packetPathForTest(boolean active) {
+        GuiChatPrompt engine = listener;
+        if (engine == null) {
+            throw new IllegalStateException("ask() must register an engine first");
+        }
+        engine.packetInstalled = active;
+    }
+
+    static boolean submitFromPacket(UUID id, String text) {
+        GuiChatPrompt engine = listener;
+        return engine != null && engine.submit(id, text);
+    }
+
     @EventHandler(priority = EventPriority.LOWEST)
     public void onChat(AsyncChatEvent event) {
+        if (packetInstalled) {
+            // PacketEvents already cancelled the packet before Bukkit events; stay dormant.
+            return;
+        }
         UUID id = event.getPlayer().getUniqueId();
         String text = PlainTextComponentSerializer.plainText().serialize(event.message());
         if (!submit(id, text)) {
@@ -227,6 +294,10 @@ public final class GuiChatPrompt implements Listener {
 
     @EventHandler(priority = EventPriority.LOWEST)
     public void onLegacyChat(AsyncPlayerChatEvent event) {
+        if (packetInstalled) {
+            // No fallback rebroadcast suppression while the packet path is active.
+            return;
+        }
         if (!submit(event.getPlayer().getUniqueId(), event.getMessage())) {
             return;
         }
@@ -236,6 +307,7 @@ public final class GuiChatPrompt implements Listener {
 
     @EventHandler
     public void onQuit(PlayerQuitEvent event) {
+        // Registered on both paths: a prompt must never call back after disconnect.
         discard(event.getPlayer().getUniqueId());
     }
 }

@@ -1,5 +1,6 @@
 package org.pvpcore.gui.kits.editor;
 
+import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
@@ -9,10 +10,13 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockbukkit.mockbukkit.MockBukkit;
 import org.mockbukkit.mockbukkit.ServerMock;
+import org.mockbukkit.mockbukkit.entity.PlayerMock;
 import org.pvpcore.features.kits.cosmetics.CustomizeSession;
+import org.pvpcore.gui.base.GuiChatPrompt;
 import org.pvpcore.gui.kits.GUI;
 
 import java.lang.reflect.Constructor;
+import java.lang.reflect.Method;
 import java.util.List;
 import java.util.UUID;
 
@@ -29,7 +33,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class ItemCustomizePageTest {
     private ServerMock server;
     private GUI gui;
-    private Player viewer;
+    private PlayerMock viewer;
 
     @BeforeEach
     void setUp() {
@@ -40,6 +44,7 @@ class ItemCustomizePageTest {
 
     @AfterEach
     void tearDown() {
+        GuiChatPrompt.clear();
         GUI.shutdown();
         MockBukkit.unmock();
     }
@@ -111,6 +116,28 @@ class ItemCustomizePageTest {
         assertFalse(staged.isStaged(0));
         assertEquals("Blade", PlainTextComponentSerializer.plainText()
                 .serialize(staged.target().getItemMeta().displayName()));
+    }
+
+    /**
+     * Drives the real rename action on the hub: the instruction comes from the dedicated
+     * facade entry point, not from a caller-supplied string that could drift.
+     */
+    @Test
+    void renameActionSendsTheDedicatedPrivateInstruction() throws Exception {
+        CustomizeSession session = session(Material.DIAMOND_SWORD, 3);
+        session.selectTarget(3);
+        CustomizePage page = page(session, 3, 1);
+
+        Method openRename = CustomizePage.class.getDeclaredMethod("openRename", Player.class);
+        openRename.setAccessible(true);
+        openRename.invoke(page, viewer);
+
+        Component message = viewer.nextComponentMessage();
+        assertNotNull(message, "the rename action must send a private instruction");
+        assertEquals("Enter a new item name using MiniMessage. Type cancel to go back.",
+                PlainTextComponentSerializer.plainText().serialize(message),
+                "the real caller must use the dedicated rename entry point");
+        assertNull(viewer.nextComponentMessage(), "the instruction must be a single private message");
     }
 
     @Test

@@ -21,9 +21,11 @@ import org.mockbukkit.mockbukkit.ServerMock;
 import org.mockbukkit.mockbukkit.entity.PlayerMock;
 import org.mockbukkit.mockbukkit.plugin.PluginMock;
 
+import java.lang.reflect.Method;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Consumer;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -35,7 +37,7 @@ class GuiChatPromptTest {
     private static final String SENTINEL = "QA_RENAME_SENTINEL_7F3A";
     private static final String INSTRUCTION =
             "Enter a new item name using MiniMessage. Type cancel to go back.";
-    private static final String LEGACY_RENAME_INSTRUCTION = "Type a new name (MiniMessage), or 'cancel'";
+    private static final String GENERIC_INSTRUCTION = "Type your answer";
 
     private ServerMock server;
 
@@ -81,7 +83,7 @@ class GuiChatPromptTest {
     }
 
     private void ask(Plugin plugin, Player player, AtomicReference<String> answer, AtomicInteger cancels) {
-        GuiChatPrompt.ask(plugin, player, LEGACY_RENAME_INSTRUCTION,
+        GuiChatPrompt.ask(plugin, player, GENERIC_INSTRUCTION,
                 answer::set, cancels::incrementAndGet);
     }
 
@@ -105,18 +107,24 @@ class GuiChatPromptTest {
         assertEquals(1, answers.get(), "a prompt opened after reload must still receive chat answers");
     }
 
+    private static void askRename(Plugin plugin, Player player,
+                                  Consumer<String> onInput, Runnable onCancel) throws Exception {
+        Method method = GuiChatPrompt.class.getDeclaredMethod("askRename", Plugin.class, Player.class,
+                Consumer.class, Runnable.class);
+        method.invoke(null, plugin, player, onInput, onCancel);
+    }
+
     @Test
-    void renamePromptSendsExactPrivateInstruction() {
+    void askRenameSendsExactlyThePrivateInstruction() throws Exception {
         PluginMock plugin = MockBukkit.createMockPlugin();
         PlayerMock player = server.addPlayer();
+        PlayerMock viewer = server.addPlayer();
 
-        GuiChatPrompt.ask(plugin, player, LEGACY_RENAME_INSTRUCTION, text -> {}, () -> {});
+        askRename(plugin, player, text -> {}, () -> {});
 
-        String messages = drain(player);
-        assertTrue(messages.contains(INSTRUCTION),
-                "rename prompt must send the exact private instruction, got: " + messages);
-        assertFalse(messages.contains(LEGACY_RENAME_INSTRUCTION),
-                "the legacy instruction wording must not be shown");
+        assertEquals(INSTRUCTION + "\n", drain(player),
+                "the dedicated rename entry point must send exactly one private instruction line");
+        assertNull(viewer.nextComponentMessage(), "the instruction must not be broadcast");
         assertTrue(GuiChatPrompt.isWaiting(player.getUniqueId()));
     }
 
@@ -254,10 +262,10 @@ class GuiChatPromptTest {
         PlayerMock player = server.addPlayer();
         AtomicInteger first = new AtomicInteger();
         AtomicInteger second = new AtomicInteger();
-        GuiChatPrompt.ask(plugin, player, LEGACY_RENAME_INSTRUCTION,
+        GuiChatPrompt.ask(plugin, player, GENERIC_INSTRUCTION,
                 text -> first.incrementAndGet(), first::incrementAndGet);
         drain(player);
-        GuiChatPrompt.ask(plugin, player, LEGACY_RENAME_INSTRUCTION,
+        GuiChatPrompt.ask(plugin, player, GENERIC_INSTRUCTION,
                 text -> second.incrementAndGet(), second::incrementAndGet);
         drain(player);
         assertTrue(GuiChatPrompt.isWaiting(player.getUniqueId()), "second prompt must be pending");
@@ -293,7 +301,7 @@ class GuiChatPromptTest {
         PluginMock plugin = MockBukkit.createMockPlugin();
         PlayerMock player = server.addPlayer();
         PlayerMock viewer = server.addPlayer();
-        GuiChatPrompt.ask(plugin, player, LEGACY_RENAME_INSTRUCTION, text -> {}, () -> {});
+        GuiChatPrompt.ask(plugin, player, GENERIC_INSTRUCTION, text -> {}, () -> {});
         drain(player);
         GuiChatPrompt.clear();
 
@@ -331,7 +339,7 @@ class GuiChatPromptTest {
     void fallbackHandlersOnlyUseLowestPriority() {
         PluginMock plugin = MockBukkit.createMockPlugin();
         Player player = server.addPlayer();
-        GuiChatPrompt.ask(plugin, player, LEGACY_RENAME_INSTRUCTION, text -> {}, () -> {});
+        GuiChatPrompt.ask(plugin, player, GENERIC_INSTRUCTION, text -> {}, () -> {});
 
         int lowest = 0;
         for (var registered : HandlerList.getRegisteredListeners(plugin)) {
@@ -345,5 +353,110 @@ class GuiChatPromptTest {
             }
         }
         assertTrue(lowest >= 2, "both Paper and legacy fallback handlers must be LOWEST");
+    }
+
+    @Test
+    void packetPathFallbackHandlersAreNoOpsAndQuitDropsPending() throws Exception {
+        PluginMock plugin = MockBukkit.createMockPlugin();
+        PlayerMock player = server.addPlayer();
+        PlayerMock viewer = server.addPlayer();
+        AtomicReference<String> answer = new AtomicReference<>();
+        AtomicInteger cancels = new AtomicInteger();
+        ask(plugin, player, answer, cancels);
+        drain(player);
+
+        GuiChatPrompt.packetPathForTest(true);
+        assertTrue(GuiChatPrompt.submitFromPacket(player.getUniqueId(), "FIRST"),
+                "the packet entry point must still consume a prompt");
+        server.getScheduler().performTicks(2);
+        assertEquals("FIRST", answer.get());
+        answer.set(null);
+
+        ask(plugin, player, answer, cancels);
+        drain(player);
+        ChatGateway chat = new ChatGateway(player, SENTINEL, Set.of(viewer));
+        chat.dispatch();
+        assertFalse(chat.paper.isCancelled(), "fallback chat handler must be a no-op on the PE path");
+        assertFalse(chat.legacy.isCancelled(), "fallback legacy handler must be a no-op on the PE path");
+        assertNull(answer.get(), "no fallback callback while PE is active");
+
+        Bukkit.getPluginManager().callEvent(new PlayerQuitEvent(player, Component.empty()));
+        assertFalse(GuiChatPrompt.isWaiting(player.getUniqueId()), "quit must drop a PE-path prompt");
+        assertFalse(GuiChatPrompt.submitFromPacket(player.getUniqueId(), SENTINEL),
+                "late packet input must be dropped");
+        server.getScheduler().performTicks(GuiChatPrompt.TIMEOUT_TICKS + 2);
+        assertNull(answer.get(), "quit must never stage a value");
+        assertEquals(0, cancels.get(), "quit must cancel the timeout");
+        GuiChatPrompt.packetPathForTest(false);
+    }
+
+    @Test
+    void firstPromptUsesItsOwnOwnerAfterALaterAskChangesOwner() {
+        PluginMock firstOwner = MockBukkit.createMockPlugin();
+        PluginMock secondOwner = MockBukkit.createMockPlugin();
+        PlayerMock firstPlayer = server.addPlayer();
+        PlayerMock secondPlayer = server.addPlayer();
+        PlayerMock viewer = server.addPlayer();
+        AtomicReference<String> firstAnswer = new AtomicReference<>();
+        AtomicReference<String> secondAnswer = new AtomicReference<>();
+
+        GuiChatPrompt.ask(firstOwner, firstPlayer, "first", firstAnswer::set, () -> {});
+        GuiChatPrompt.ask(secondOwner, secondPlayer, "second", secondAnswer::set, () -> {});
+        drain(firstPlayer);
+        drain(secondPlayer);
+
+        ChatGateway chat = new ChatGateway(firstPlayer, SENTINEL, Set.of(viewer));
+        chat.dispatch();
+
+        assertTrue(chat.paper.isCancelled(), "the first prompt's text must be suppressed");
+        assertTrue(chat.legacy.isCancelled(), "the first prompt's text must be suppressed on both events");
+        assertNull(viewer.nextComponentMessage(), "the first prompt's text must not broadcast");
+        assertNull(firstPlayer.nextComponentMessage(), "the first prompt's text must not echo");
+        server.getScheduler().performTicks(2);
+        assertEquals(SENTINEL, firstAnswer.get(), "the callback must be scheduled with pending.owner()");
+        assertNull(secondAnswer.get(), "the second prompt must not receive the first answer");
+    }
+
+    @Test
+    void clearInvalidatesAnAlreadyScheduledCallback() {
+        PluginMock plugin = MockBukkit.createMockPlugin();
+        PlayerMock player = server.addPlayer();
+        AtomicInteger answers = new AtomicInteger();
+        AtomicInteger cancels = new AtomicInteger();
+        GuiChatPrompt.ask(plugin, player, GENERIC_INSTRUCTION,
+                text -> answers.incrementAndGet(), cancels::incrementAndGet);
+        drain(player);
+
+        new ChatGateway(player, SENTINEL, Set.of()).dispatch();
+        GuiChatPrompt.clear();
+        server.getScheduler().performTicks(2);
+
+        assertEquals(0, answers.get(), "clear() must invalidate the scheduled callback by pending identity");
+        assertEquals(0, cancels.get());
+        assertFalse(GuiChatPrompt.isWaiting(player.getUniqueId()));
+    }
+
+    @Test
+    void duplicateInputBeforeSchedulerTicksIsSuppressedOnce() {
+        PluginMock plugin = MockBukkit.createMockPlugin();
+        PlayerMock player = server.addPlayer();
+        PlayerMock viewer = server.addPlayer();
+        AtomicReference<String> answer = new AtomicReference<>();
+        AtomicInteger cancels = new AtomicInteger();
+        ask(plugin, player, answer, cancels);
+        drain(player);
+
+        ChatGateway first = new ChatGateway(player, SENTINEL, Set.of(viewer));
+        first.dispatch();
+        ChatGateway duplicate = new ChatGateway(player, "DUPLICATE_INPUT", Set.of(viewer));
+        duplicate.dispatch();
+
+        assertTrue(first.paper.isCancelled());
+        assertTrue(duplicate.paper.isCancelled(), "a consumed prompt suppresses duplicates until the task runs");
+        assertTrue(duplicate.legacy.isCancelled());
+        server.getScheduler().performTicks(2);
+        assertEquals(SENTINEL, answer.get(), "exactly one callback must stage the first answer");
+        assertNull(viewer.nextComponentMessage(), "no duplicate may be broadcast");
+        assertEquals(0, cancels.get());
     }
 }
