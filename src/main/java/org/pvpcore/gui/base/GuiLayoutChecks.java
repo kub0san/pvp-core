@@ -1,5 +1,8 @@
 package org.pvpcore.gui.base;
 
+import java.util.HashSet;
+import java.util.Set;
+
 /**
  * Sanity checks on {@link GuiLayouts}. Runs once at plugin load. If any check
  * fails the plugin refuses to start with a message naming the bad constant,
@@ -35,6 +38,109 @@ public final class GuiLayoutChecks {
         }
     }
 
+    /**
+     * Three-row cosmetic screens. This check is scoped strictly to the {@code COSMETIC_*}
+     * constants: the legacy six-row customize slots overlap these numbers and must not
+     * be compared against them.
+     */
+    private static void checkCosmeticLayouts() {
+        assertEqual("COSMETIC_HUB_ROWS", GuiLayouts.COSMETIC_HUB_ROWS, 3);
+        assertEqual("COSMETIC_HUB_SIZE", GuiLayouts.COSMETIC_HUB_SIZE,
+                GuiLayouts.COSMETIC_HUB_ROWS * GuiLayouts.COLUMNS);
+        assertEqual("COSMETIC_BROWSER_ROWS", GuiLayouts.COSMETIC_BROWSER_ROWS, 3);
+        assertEqual("COSMETIC_BROWSER_SIZE", GuiLayouts.COSMETIC_BROWSER_SIZE,
+                GuiLayouts.COSMETIC_BROWSER_ROWS * GuiLayouts.COLUMNS);
+        assertEqual("COSMETIC_BROWSER_SIZE (slots)", GuiLayouts.COSMETIC_BROWSER_SIZE, 27);
+        assertEqual("COSMETIC_BROWSER_ENTRIES_PER_PAGE",
+                GuiLayouts.COSMETIC_BROWSER_ENTRIES_PER_PAGE, 18);
+
+        // Hub actions keep the centre-column pattern: row 1, columns 0/2/4/6/8.
+        assertEqual("COSMETIC_HUB_RENAME_SLOT", GuiLayouts.COSMETIC_HUB_RENAME_SLOT,
+                GuiLayouts.COLUMNS);
+        assertEqual("COSMETIC_HUB_ENCHANT_SLOT", GuiLayouts.COSMETIC_HUB_ENCHANT_SLOT,
+                GuiLayouts.COSMETIC_HUB_RENAME_SLOT + 2);
+        assertEqual("COSMETIC_HUB_TRIM_SLOT", GuiLayouts.COSMETIC_HUB_TRIM_SLOT,
+                GuiLayouts.COSMETIC_HUB_ENCHANT_SLOT + 2);
+        assertEqual("COSMETIC_HUB_APPLY_SLOT", GuiLayouts.COSMETIC_HUB_APPLY_SLOT,
+                GuiLayouts.COSMETIC_HUB_TRIM_SLOT + 2);
+        assertEqual("COSMETIC_HUB_CANCEL_SLOT", GuiLayouts.COSMETIC_HUB_CANCEL_SLOT,
+                GuiLayouts.COSMETIC_HUB_APPLY_SLOT + 2);
+
+        // Entries fill the first two rows and must stop before the showcase.
+        assertEqual("COSMETIC_BROWSER_ENTRY_FIRST", GuiLayouts.COSMETIC_BROWSER_ENTRY_FIRST, 0);
+        assertEqual("COSMETIC_BROWSER_ENTRY_LAST", GuiLayouts.COSMETIC_BROWSER_ENTRY_LAST,
+                GuiLayouts.COSMETIC_BROWSER_ENTRY_FIRST
+                        + GuiLayouts.COSMETIC_BROWSER_ENTRIES_PER_PAGE - 1);
+        if (GuiLayouts.COSMETIC_BROWSER_ENTRY_LAST >= GuiLayouts.COSMETIC_BROWSER_PREVIEW_SLOT) {
+            throw new IllegalStateException("Cosmetic browser entries overlap the preview slot");
+        }
+        assertEqual("COSMETIC_BROWSER_PREVIEW_SLOT", GuiLayouts.COSMETIC_BROWSER_PREVIEW_SLOT,
+                GuiLayouts.COSMETIC_BROWSER_ENTRY_LAST + 1);
+        assertEqual("COSMETIC_BROWSER_STATE_SLOT", GuiLayouts.COSMETIC_BROWSER_STATE_SLOT,
+                GuiLayouts.COSMETIC_BROWSER_PREVIEW_SLOT + 1);
+        assertEqual("COSMETIC_BROWSER_HINT_SLOT", GuiLayouts.COSMETIC_BROWSER_HINT_SLOT,
+                GuiLayouts.COSMETIC_BROWSER_STATE_SLOT + 1);
+
+        int[] hub = {
+                GuiLayouts.COSMETIC_HUB_INFO_SLOT, GuiLayouts.COSMETIC_HUB_PREVIEW_SLOT,
+                GuiLayouts.COSMETIC_HUB_STATE_SLOT, GuiLayouts.COSMETIC_HUB_RENAME_SLOT,
+                GuiLayouts.COSMETIC_HUB_ENCHANT_SLOT, GuiLayouts.COSMETIC_HUB_TRIM_SLOT,
+                GuiLayouts.COSMETIC_HUB_APPLY_SLOT, GuiLayouts.COSMETIC_HUB_CANCEL_SLOT,
+                GuiLayouts.COSMETIC_HUB_HINT_SLOT
+        };
+        int[] enchantNav = {
+                GuiLayouts.COSMETIC_ENCHANT_BACK_SLOT, GuiLayouts.COSMETIC_ENCHANT_PREV_SLOT,
+                GuiLayouts.COSMETIC_ENCHANT_NEXT_SLOT, GuiLayouts.COSMETIC_ENCHANT_APPLY_SLOT,
+                GuiLayouts.COSMETIC_ENCHANT_CANCEL_SLOT, GuiLayouts.COSMETIC_ENCHANT_PAGE_SLOT
+        };
+        int[] trimNav = {
+                GuiLayouts.COSMETIC_TRIM_MODE_SLOT, GuiLayouts.COSMETIC_TRIM_PREV_SLOT,
+                GuiLayouts.COSMETIC_TRIM_NEXT_SLOT, GuiLayouts.COSMETIC_TRIM_PAGE_SLOT,
+                GuiLayouts.COSMETIC_TRIM_REMOVE_SLOT, GuiLayouts.COSMETIC_TRIM_BACK_SLOT
+        };
+        assertCosmeticSlots("customise hub", hub, GuiLayouts.COSMETIC_HUB_SIZE);
+        assertCosmeticSlots("enchant browser", cosmeticBrowserSlots(enchantNav),
+                GuiLayouts.COSMETIC_BROWSER_SIZE);
+        assertCosmeticSlots("trim browser", cosmeticBrowserSlots(trimNav),
+                GuiLayouts.COSMETIC_BROWSER_SIZE);
+
+        // Both nav rows must start immediately after the hint slot.
+        assertEqual("cosmetic enchant nav first", enchantNav[0],
+                GuiLayouts.COSMETIC_BROWSER_HINT_SLOT + 1);
+        assertEqual("cosmetic trim nav first", trimNav[0],
+                GuiLayouts.COSMETIC_BROWSER_HINT_SLOT + 1);
+    }
+
+    /** Entries 0-17, then preview / state / hint, then the screen's six nav slots. */
+    private static int[] cosmeticBrowserSlots(int[] nav) {
+        int[] slots = new int[GuiLayouts.COSMETIC_BROWSER_ENTRIES_PER_PAGE + 3 + nav.length];
+        int index = 0;
+        for (int slot = GuiLayouts.COSMETIC_BROWSER_ENTRY_FIRST;
+             slot <= GuiLayouts.COSMETIC_BROWSER_ENTRY_LAST; slot++) {
+            slots[index++] = slot;
+        }
+        slots[index++] = GuiLayouts.COSMETIC_BROWSER_PREVIEW_SLOT;
+        slots[index++] = GuiLayouts.COSMETIC_BROWSER_STATE_SLOT;
+        slots[index++] = GuiLayouts.COSMETIC_BROWSER_HINT_SLOT;
+        System.arraycopy(nav, 0, slots, index, nav.length);
+        return slots;
+    }
+
+    private static void assertCosmeticSlots(String name, int[] slots, int size) {
+        for (int slot : slots) {
+            if (slot < 0 || slot >= size) {
+                throw new IllegalStateException(
+                        name + " slot " + slot + " is outside 0.." + (size - 1));
+            }
+        }
+        Set<Integer> seen = new HashSet<>();
+        for (int slot : slots) {
+            if (!seen.add(slot)) {
+                throw new IllegalStateException(name + " has duplicate slot " + slot);
+            }
+        }
+    }
+
     /** Called once from {@code PvPCorePlugin#onEnable}. */
     public static void verify() {
         checkEditorRows();
@@ -45,6 +151,7 @@ public final class GuiLayoutChecks {
         checkSettingsCapacity();
         checkDockRows();
         checkCustomizeRows();
+        checkCosmeticLayouts();
     }
 
     // ------------------------------------------------------------------ screens

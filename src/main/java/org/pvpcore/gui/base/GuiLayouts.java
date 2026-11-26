@@ -107,6 +107,50 @@ public final class GuiLayouts {
     public static final int RENAME_TARGET_LAST = 40;
     public static final int RENAME_BACK_SLOT = 53;
 
+    // ---- Kit cosmetics: three-row customise hub and browser screens ----
+    // These are separate from the legacy six-row customize constants above. The
+    // legacy columns stay untouched for old screens; only the new screens below
+    // consume this contract. GuiLayoutChecks.checkCosmeticLayouts() pins it.
+
+    /** Customise hub: info / showcase / staged state on row 0, actions on row 1, hint on row 2. */
+    public static final int COSMETIC_HUB_ROWS = 3;
+    public static final int COSMETIC_HUB_SIZE = 27;
+    public static final int COSMETIC_HUB_INFO_SLOT = 0;
+    public static final int COSMETIC_HUB_PREVIEW_SLOT = 4;
+    public static final int COSMETIC_HUB_STATE_SLOT = 8;
+    public static final int COSMETIC_HUB_RENAME_SLOT = 9;
+    public static final int COSMETIC_HUB_ENCHANT_SLOT = 11;
+    public static final int COSMETIC_HUB_TRIM_SLOT = 13;
+    public static final int COSMETIC_HUB_APPLY_SLOT = 15;
+    public static final int COSMETIC_HUB_CANCEL_SLOT = 17;
+    public static final int COSMETIC_HUB_HINT_SLOT = 21;
+
+    /** Shared browser canvas: 18 entries, then preview / state / hint, then six nav controls. */
+    public static final int COSMETIC_BROWSER_ROWS = 3;
+    public static final int COSMETIC_BROWSER_SIZE = 27;
+    public static final int COSMETIC_BROWSER_ENTRIES_PER_PAGE = 18;
+    public static final int COSMETIC_BROWSER_ENTRY_FIRST = 0;
+    public static final int COSMETIC_BROWSER_ENTRY_LAST = 17;
+    public static final int COSMETIC_BROWSER_PREVIEW_SLOT = 18;
+    public static final int COSMETIC_BROWSER_STATE_SLOT = 19;
+    public static final int COSMETIC_BROWSER_HINT_SLOT = 20;
+
+    /** Enchant browser nav: Back / Prev / Next / Apply / Cancel / Page. */
+    public static final int COSMETIC_ENCHANT_BACK_SLOT = 21;
+    public static final int COSMETIC_ENCHANT_PREV_SLOT = 22;
+    public static final int COSMETIC_ENCHANT_NEXT_SLOT = 23;
+    public static final int COSMETIC_ENCHANT_APPLY_SLOT = 24;
+    public static final int COSMETIC_ENCHANT_CANCEL_SLOT = 25;
+    public static final int COSMETIC_ENCHANT_PAGE_SLOT = 26;
+
+    /** Trim browser nav: Mode / Prev / Next / Page / Remove / Back. */
+    public static final int COSMETIC_TRIM_MODE_SLOT = 21;
+    public static final int COSMETIC_TRIM_PREV_SLOT = 22;
+    public static final int COSMETIC_TRIM_NEXT_SLOT = 23;
+    public static final int COSMETIC_TRIM_PAGE_SLOT = 24;
+    public static final int COSMETIC_TRIM_REMOVE_SLOT = 25;
+    public static final int COSMETIC_TRIM_BACK_SLOT = 26;
+
     // ---- Public kit preview (5 rows, full canvas) ----
     public static final int ROWS_PREVIEW = 5;
 
