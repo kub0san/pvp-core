@@ -103,6 +103,46 @@ class GuiPreviewItemsTest {
     }
 
     @Test
+    void stripsTrailingHintLoreWhileOrdinaryMetadataSurvives() {
+        ItemStack source = new ItemStack(Material.DIAMOND_CHESTPLATE);
+        ItemMeta meta = source.getItemMeta();
+        meta.setDisplayName("Kept name");
+        meta.setLore(List.of("Kept lore"));
+        meta.addEnchant(Enchantment.PROTECTION, 2, true);
+        meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES);
+        NamespacedKey keptKey = new NamespacedKey("pvp-core", "kept_key");
+        meta.getPersistentDataContainer().set(keptKey, PersistentDataType.STRING, "kept");
+        source.setItemMeta(meta);
+        ArmorMeta armor = (ArmorMeta) source.getItemMeta();
+        armor.setTrim(new ArmorTrim(TrimMaterial.DIAMOND, TrimPattern.COAST));
+        source.setItemMeta(armor);
+
+        // Caller rule: hints are applied last, so strip removes exactly that trailing block.
+        ItemStack staged = EditorHintLore.apply(source.clone());
+        assertTrue(EditorHintLore.has(staged));
+
+        ItemStack display = GuiPreviewItems.displayClone(staged);
+        ItemMeta copy = display.getItemMeta();
+
+        assertFalse(EditorHintLore.has(display));
+        assertEquals("Kept name", copy.getDisplayName());
+        assertEquals(List.of("Kept lore"), copy.getLore());
+        assertEquals(2, copy.getEnchants().get(Enchantment.PROTECTION));
+        assertEquals("kept", copy.getPersistentDataContainer().get(keptKey, PersistentDataType.STRING));
+        assertEquals(java.util.Set.of(ItemFlag.HIDE_ATTRIBUTES), copy.getItemFlags());
+        ArmorTrim trim = ((ArmorMeta) display.getItemMeta()).getTrim();
+        assertNotNull(trim);
+        assertEquals(TrimMaterial.DIAMOND, trim.getMaterial());
+        assertEquals(TrimPattern.COAST, trim.getPattern());
+
+        // Neither the staged input nor the source is modified by the display clone.
+        assertTrue(EditorHintLore.has(staged));
+        assertEquals(4, staged.getItemMeta().lore().size());
+        assertFalse(EditorHintLore.has(source));
+        assertEquals(List.of("Kept lore"), source.getItemMeta().getLore());
+    }
+
+    @Test
     void addsNoFlagsLoreEnchantsOrPdcKeysOfItsOwn() {
         ItemStack source = new ItemStack(Material.IRON_CHESTPLATE);
         ItemMeta meta = source.getItemMeta();
