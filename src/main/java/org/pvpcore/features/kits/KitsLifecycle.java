@@ -10,6 +10,7 @@ import org.pvpcore.listeners.antiexploit.CommandListener;
 import org.pvpcore.listeners.antiexploit.ShulkerDropItemsListener;
 import org.pvpcore.listeners.kits.AutoRekitListener;
 import org.pvpcore.listeners.kits.JoinListener;
+import org.pvpcore.listeners.kits.KitEditorDropGuard;
 import org.pvpcore.listeners.kits.KitMenuCloseListener;
 import org.pvpcore.listeners.kits.OldDeathDropListener;
 import org.pvpcore.listeners.kits.QuitListener;
@@ -488,6 +489,7 @@ final class KitsLifecycle {
         registerListener(new JoinListener(Kits.plugin, ctx, kits.updateChecker), Kits.plugin);
         registerListener(new QuitListener(Kits.plugin, ctx), Kits.plugin);
         registerListener(new KitMenuCloseListener(ctx), Kits.plugin);
+        registerListener(new KitEditorDropGuard(), Kits.plugin);
         registerListener(new AutoRekitListener(Kits.plugin, ctx), Kits.plugin);
 
         FileConfiguration cfg = ctx.config();

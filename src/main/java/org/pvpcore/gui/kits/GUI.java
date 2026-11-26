@@ -108,6 +108,11 @@ public class GUI implements GuiSession {
         return editorContexts.remove(viewer);
     }
 
+    /** Reads the editor a player currently has open without consuming it. */
+    public static EditorContext peekEditorContext(Player viewer) {
+        return viewer == null ? null : editorContexts.get(viewer.getUniqueId());
+    }
+
     public static void forgetMainMenuPage(UUID player) {
         lastMainMenuPage.remove(player);
         clearedEditors.remove(player);

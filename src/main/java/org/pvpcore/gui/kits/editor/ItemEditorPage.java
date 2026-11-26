@@ -5,11 +5,15 @@ import com.github.stefvanschie.inventoryframework.gui.type.ChestGui;
 import com.github.stefvanschie.inventoryframework.pane.StaticPane;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
+import org.bukkit.event.inventory.ClickType;
+import org.bukkit.event.inventory.InventoryAction;
+import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 import org.pvpcore.features.kits.ItemFilter;
 import org.pvpcore.features.kits.KitManager;
 import org.pvpcore.features.kits.KitsContext;
+import org.pvpcore.features.kits.cosmetics.CustomizeSession;
 import org.pvpcore.gui.kits.GUI;
 import org.pvpcore.gui.base.GuiTheme;
 import org.pvpcore.gui.base.GuiFrame;
@@ -40,10 +44,12 @@ import java.util.UUID;
 public final class ItemEditorPage extends GuiScreen {
     private static final String PERMISSION = "perplayerkit.admin";
 
+    private final GUI gui;
     private final EditorSpec spec;
 
     private ItemEditorPage(GUI gui, Player player, EditorSpec spec, GuiFrame.Density density) {
         super(gui, player, GuiLayouts.ROWS_EDITOR, density, spec.permission(), spec.feature());
+        this.gui = gui;
         this.spec = spec;
     }
 
@@ -242,7 +248,68 @@ public final class ItemEditorPage extends GuiScreen {
 
     @Override
     protected void protect(ChestGui chest) {
-        GuiGuard.editable(chest, spec.permission(), spec.feature(), spec::isEditableSlot);
+        GuiGuard.editable(chest, spec.permission(), spec.feature(), spec::isEditableSlot,
+                topSize(), this::handleContentClick, this::handleGlobalClick);
+    }
+
+    /**
+     * Raw-slot item actions. These are composed into the guard, never assigned over it, so the
+     * permission, collect-to-cursor, non-editable-slot and drag rules stay intact. Cancelling
+     * happens only when an action actually claims the click: ordinary pickups and placements in
+     * the content range must keep working.
+     */
+    private void handleContentClick(InventoryClickEvent event) {
+        int raw = event.getRawSlot();
+        int start = spec.contentStart();
+        int end = start + spec.contentLength();
+        ClickType click = event.getClick();
+
+        if (ItemEditorActions.customize(click, raw, start, end)) {
+            event.setCancelled(true);
+            ItemStack current = event.getCurrentItem();
+            if (current != null && !current.getType().isAir()) {
+                openCustomize();
+            }
+            return;
+        }
+        boolean cursorEmpty = event.getCursor() == null || event.getCursor().getType().isAir();
+        if (ItemEditorActions.copy(click, raw, start, end, cursorEmpty)) {
+            event.setCancelled(true);
+            ItemStack current = event.getCurrentItem();
+            if (current != null && !current.getType().isAir()) {
+                event.setCursor(current.clone());
+            }
+            return;
+        }
+        if (ItemEditorActions.discard(click, raw, start, end)) {
+            event.setCancelled(true);
+            // Remove the complete stack without letting vanilla spawn an ItemEntity.
+            event.setCurrentItem(null);
+        }
+    }
+
+    /** Stops bottom-inventory number-key/offhand swaps from reaching the editor's slots. */
+    private void handleGlobalClick(InventoryClickEvent event) {
+        if (event.getRawSlot() < topSize()) {
+            return;
+        }
+        ClickType click = event.getClick();
+        InventoryAction action = event.getAction();
+        if (action == InventoryAction.HOTBAR_SWAP || action == InventoryAction.HOTBAR_MOVE_AND_READD
+                || click == ClickType.SWAP_OFFHAND) {
+            event.setCancelled(true);
+        }
+    }
+
+    /** Shift-click entry into cosmetics. The item-specific hub arrives with the UX redesign. */
+    private void openCustomize() {
+        GUI.EditorContext context = spec.context();
+        if (!spec.editable() || context == null || context.type() != GUI.EditorType.KIT) {
+            return;
+        }
+        gui.flushOpenEditor(player);
+        CustomizePage.open(gui, player, context.slot(),
+                new CustomizeSession(gui.kits().kitManager().getPlayerKit(player.getUniqueId(), context.slot())));
     }
 
     @Override
