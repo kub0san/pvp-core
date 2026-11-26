@@ -53,6 +53,7 @@ public final class EnchantmentEditorPage extends GuiScreen {
     private final GUI gui;
     private final CustomizeSession session;
     private final int kitSlot;
+    private final ItemFilter filter;
     private final Predicate<ItemStack> validator;
     private final int initialEnchantCount;
     private ItemStack draft;
@@ -68,10 +69,10 @@ public final class EnchantmentEditorPage extends GuiScreen {
         }
         ItemStack target = session == null ? null : session.target();
         this.draft = target == null ? null : target.clone();
-        this.initialEnchantCount = draft == null ? 0 : draft.getEnchantments().size();
-        ItemFilter filter = gui.kits() == null ? null : gui.kits().itemFilter();
+        this.initialEnchantCount = enchantCount(draft);
+        this.filter = gui.kits() == null ? null : gui.kits().itemFilter();
         // No filter means no validated staging path: fail closed rather than bypass policy.
-        this.validator = filter == null ? item -> false : filter::allowed;
+        this.validator = this.filter == null ? item -> false : this.filter::allowed;
         gui.registerCustomizeScreen(player.getUniqueId());
     }
 
@@ -133,8 +134,8 @@ public final class EnchantmentEditorPage extends GuiScreen {
         List<EnchantmentCatalog.Entry> slice = pager.slice(entries);
         for (int index = 0; index < slice.size(); index++) {
             EnchantmentCatalog.Entry entry = slice.get(index);
-            int current = draft == null ? 0 : draft.getEnchantmentLevel(entry.enchantment());
-            int max = Math.max(1, entry.enchantment().getMaxLevel());
+            int current = currentLevel(draft, entry.enchantment());
+            int max = maxLevel(draft, entry.enchantment());
             ItemStack icon = displayIcon(entry, current, max);
             final int level = current;
             int raw = entrySlots().get(index);
@@ -222,6 +223,30 @@ public final class EnchantmentEditorPage extends GuiScreen {
 
     // ------------------------------------------------------------------ editing
 
+    /** Stored enchant levels on books; applied enchant levels on every other item. */
+    private static int currentLevel(ItemStack item, Enchantment enchantment) {
+        if (item == null) return 0;
+        ItemMeta meta = item.getItemMeta();
+        if (meta instanceof EnchantmentStorageMeta book) {
+            return book.getStoredEnchants().getOrDefault(enchantment, 0);
+        }
+        return item.getEnchantments().getOrDefault(enchantment, 0);
+    }
+
+    /** Counts the same enchant storage {@link #currentLevel} reads, for the Apply message. */
+    private static int enchantCount(ItemStack item) {
+        if (item == null) return 0;
+        ItemMeta meta = item.getItemMeta();
+        if (meta instanceof EnchantmentStorageMeta book) return book.getStoredEnchants().size();
+        return item.getEnchantments().size();
+    }
+
+    /** Configured filter cap when present, otherwise the enchantment's vanilla maximum. */
+    private int maxLevel(ItemStack item, Enchantment enchantment) {
+        int configured = filter == null ? 0 : filter.maxLevel(item, enchantment);
+        return Math.max(1, configured > 0 ? configured : enchantment.getMaxLevel());
+    }
+
     /** Advances 1..max and wraps back to "no level" after the maximum. */
     static int nextLevel(int current, int maxLevel) {
         int max = Math.max(1, maxLevel);
@@ -238,6 +263,7 @@ public final class EnchantmentEditorPage extends GuiScreen {
         if (source == null || enchantment == null) return null;
         ItemStack result = source.clone();
         ItemMeta meta = result.getItemMeta();
+        if (meta == null) return null;
         if (meta instanceof EnchantmentStorageMeta book) {
             book.removeStoredEnchant(enchantment);
             if (level > 0) {
@@ -246,20 +272,22 @@ public final class EnchantmentEditorPage extends GuiScreen {
                 } catch (RuntimeException ex) {
                     return null;
                 }
-                if (book.getStoredEnchantLevel(enchantment) != level) return null;
+                if (book.getStoredEnchants().getOrDefault(enchantment, 0) != level) return null;
             }
             result.setItemMeta(book);
             return result;
         }
-        result.removeEnchantment(enchantment);
+        meta.removeEnchant(enchantment);
         if (level > 0) {
             try {
-                result.addEnchantment(enchantment, level);
+                // Ignore vanilla restrictions: ItemFilter.allowed is the sole policy authority.
+                meta.addEnchant(enchantment, level, true);
             } catch (RuntimeException ex) {
                 return null;
             }
-            if (result.getEnchantmentLevel(enchantment) != level) return null;
+            if (meta.getEnchantLevel(enchantment) != level) return null;
         }
+        result.setItemMeta(meta);
         return result;
     }
 
@@ -291,7 +319,7 @@ public final class EnchantmentEditorPage extends GuiScreen {
             send(gui, player, "error.enchant-invalid");
             return;
         }
-        int finalCount = draft.getEnchantments().size();
+        int finalCount = enchantCount(draft);
         send(gui, player, finalCount < initialEnchantCount ? "gui.enchant-removed" : "gui.enchant-added");
         CustomizePage.reopen(gui, player, session, session.targetSlot(), kitSlot);
     }

@@ -129,6 +129,17 @@ public class ItemFilter {
         return true;
     }
 
+    /**
+     * Configured level cap for one enchantment on an item. {@code 0} means no configured cap, so
+     * callers fall back to the enchantment's vanilla maximum; the cap applies to stored enchants
+     * on books as well as applied enchants on other items.
+     */
+    public int maxLevel(ItemStack item, Enchantment enchantment) {
+        if (enchantment == null || item == null || item.getType().isAir()) return 0;
+        Integer max = settings.forMaterial(item.getType()).enchantments().get(enchantment.getKey().toString());
+        return max == null ? 0 : max;
+    }
+
     private boolean allowedEnchants(ItemStack item, Map<Enchantment, Integer> enchants, ItemFilterRules.Rule rule, boolean stored) {
         for (var entry : enchants.entrySet()) {
             Enchantment enchant = entry.getKey(); int level = entry.getValue();
