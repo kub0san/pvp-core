@@ -49,6 +49,13 @@ public class ItemFilter {
         whitelist.clear();
     }
 
+    /** Test seam for policy queries without a live plugin context; no static state is touched. */
+    ItemFilter(ItemFilterRules.Settings settings, Plugin plugin) {
+        this.context = null;
+        this.plugin = plugin;
+        this.settings = java.util.Objects.requireNonNull(settings, "settings");
+    }
+
     public KitsContext context() { return context; }
 
     /** why: stateless item-array copy utility retained for external/legacy compatibility. */
@@ -138,6 +145,37 @@ public class ItemFilter {
         if (enchantment == null || item == null || item.getType().isAir()) return 0;
         Integer max = settings.forMaterial(item.getType()).enchantments().get(enchantment.getKey().toString());
         return max == null ? 0 : max;
+    }
+
+    /** Read-only: whether this filter enforces any configured rules at all. */
+    public boolean enabled() {
+        return settings.enabled();
+    }
+
+    /**
+     * The level ceiling the editor may offer. A positive configured cap wins; an absent or
+     * zero cap falls back to the enchantment's vanilla maximum, exactly as {@link #maxLevel}
+     * and {@link #allowedEnchants} treat the tri-state cap. This is the single source for
+     * the browser ceiling so Apply can never disagree with what the browser offers.
+     */
+    public int effectiveMaxLevel(ItemStack item, Enchantment enchantment) {
+        if (enchantment == null || item == null || item.getType().isAir()) return 1;
+        int configured = maxLevel(item, enchantment);
+        if (configured > 0) return configured;
+        try {
+            return Math.max(1, enchantment.getMaxLevel());
+        } catch (RuntimeException | LinkageError ex) {
+            return 1;
+        }
+    }
+
+    /**
+     * Read-only view of the effective conflicting-enchant rule for this item. When the
+     * filter is disabled there is no enforcement, so callers must not present a red badge.
+     */
+    public boolean allowsIncompatible(ItemStack item) {
+        if (!settings.enabled() || item == null || item.getType().isAir()) return true;
+        return settings.forMaterial(item.getType()).incompatible();
     }
 
     private boolean allowedEnchants(ItemStack item, Map<Enchantment, Integer> enchants, ItemFilterRules.Rule rule, boolean stored) {
