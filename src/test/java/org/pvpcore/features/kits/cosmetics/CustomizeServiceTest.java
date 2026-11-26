@@ -1,6 +1,7 @@
 package org.pvpcore.features.kits.cosmetics;
 
 import org.bukkit.Material;
+import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 import org.junit.jupiter.api.AfterEach;
@@ -13,6 +14,10 @@ import org.pvpcore.config.kits.CustomizeRules;
 import org.pvpcore.features.kits.KitSaveResult;
 import org.pvpcore.gui.kits.GUI;
 
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
+import java.util.Locale;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -21,6 +26,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
@@ -243,6 +249,55 @@ class CustomizeServiceTest {
 
         assertTrue(gui.isCustomizeStale(viewer));
         assertNull(gui.takePendingCustomize(viewer, operationId));
+    }
+
+    @Test
+    void setPendingCustomizeDoesNotClearReloadStaleMarker() {
+        UUID viewer = player.getUniqueId();
+        gui.markCustomizeStale(viewer);
+
+        UUID operationId = gui.setPendingCustomize(viewer, session);
+
+        assertTrue(gui.isCustomizeStale(viewer));
+        assertNull(gui.takePendingCustomize(viewer, operationId));
+    }
+
+    @Test
+    void failedSaveRebaseFromCacheKeepsStagedEditsAndRetryQueues() {
+        AtomicReference<ItemStack[]> cache = new AtomicReference<>(kit());
+        reader = (p, slot) -> cache.get();
+        saver = (p, slot, kit) -> {
+            saves.incrementAndGet();
+            cache.set(kit); // KitManager mutates the cache before the DB future resolves
+            savedKit.set(kit);
+            return saveResult;
+        };
+
+        assertEquals(ApplyResult.QUEUED, service().commit(player, 1, session));
+        pendingWrite.completeExceptionally(new IllegalStateException("disk failed"));
+
+        CustomizeSession rebased = session.rebaseFrom(cache.get());
+
+        assertTrue(rebased.matchesCurrent(cache.get()));
+        assertEquals(Material.NETHERITE_CHESTPLATE, rebased.target().getType());
+        assertEquals(ApplyResult.QUEUED, service().commit(player, 1, rebased));
+        assertEquals(2, saves.get());
+    }
+
+    @Test
+    void saveFailureMessageKeysAreDistinctAndLegacyKeyStillSaysNoChanges() throws Exception {
+        YamlConfiguration yaml;
+        try (InputStream in = getClass().getClassLoader().getResourceAsStream("messages.yml")) {
+            assertNotNull(in, "bundled messages.yml must be on the test classpath");
+            yaml = YamlConfiguration.loadConfiguration(new InputStreamReader(in, StandardCharsets.UTF_8));
+        }
+        String legacy = yaml.getString("pvpcore.error.cosmetics-save-failed");
+        String unconfirmed = yaml.getString("pvpcore.error.cosmetics-save-unconfirmed");
+
+        assertNotNull(legacy);
+        assertNotNull(unconfirmed);
+        assertNotEquals(legacy, unconfirmed);
+        assertTrue(legacy.toLowerCase(Locale.ROOT).contains("no changes were applied"));
     }
 
     @Test

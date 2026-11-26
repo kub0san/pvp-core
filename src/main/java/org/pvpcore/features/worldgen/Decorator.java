@@ -21,8 +21,9 @@ final class Decorator extends BlockPopulator {
     @Override
     public void populate(@NotNull WorldInfo info, @NotNull Random random,
                          int chunkX, int chunkZ, @NotNull LimitedRegion region) {
-        if (settings.insideRadius(chunkX, chunkZ)) {
-            biome.terrain().decorate(settings, info, random, chunkX, chunkZ, region);
+        WorldGenSettings.Snapshot snapshot = settings.snapshot();
+        if (settings.insideRadius(snapshot, chunkX, chunkZ)) {
+            biome.terrain().decorate(snapshot, info, random, chunkX, chunkZ, region);
         }
     }
 }

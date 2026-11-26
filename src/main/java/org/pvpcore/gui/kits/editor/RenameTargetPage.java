@@ -29,7 +29,7 @@ public final class RenameTargetPage extends GuiScreen {
     private final CustomizeSession session;
     private final int kitSlot;
 
-    private RenameTargetPage(GUI gui, Player player, CustomizeSession session, int kitSlot) {
+    RenameTargetPage(GUI gui, Player player, CustomizeSession session, int kitSlot) {
         super(gui, player, GuiLayouts.ROWS_EDITOR, org.pvpcore.gui.base.GuiFrame.Density.NONE,
                 "perplayerkit.kit", LocationFeature.KITS);
         this.gui = gui;
@@ -41,6 +41,10 @@ public final class RenameTargetPage extends GuiScreen {
     public static void open(GUI gui, Player player, CustomizeSession session, int kitSlot) {
         if (session == null || gui == null || player == null) return;
         if (gui.kits() == null) return;
+        if (gui.isCustomizeStale(player.getUniqueId())) {
+            gui.kits().lang().send(player, "error.cosmetics-kit-changed");
+            return;
+        }
         if (!org.pvpcore.commands.kits.core.ActionGuards.allowed(player, "perplayerkit.kit", LocationFeature.KITS)) return;
         CustomizeRules rules = CustomizeRules.parse(gui.kits().config().getConfigurationSection("customize"));
         if (!rules.enabled()) {
@@ -48,6 +52,14 @@ public final class RenameTargetPage extends GuiScreen {
             return;
         }
         new RenameTargetPage(gui, player, session, kitSlot).show();
+    }
+
+    /** Cancel callback: a stale/reload-invalidated operation must not reopen a stale screen. */
+    boolean cancelRename(Player p, UUID operationId) {
+        CustomizeSession taken = gui.takePendingCustomize(p.getUniqueId(), operationId);
+        if (taken == null) return false;
+        CustomizePage.reopen(gui, p, kitSlot, taken);
+        return true;
     }
 
     @Override
@@ -82,7 +94,7 @@ public final class RenameTargetPage extends GuiScreen {
                 if (empty) return;
                 SoundManager.playClick(p);
                 session.selectTarget(targetSlot);
-                UUID opId = gui.setPendingCustomize(p.getUniqueId(), session);
+                UUID opId = gui.holdPendingCustomize(p.getUniqueId(), session);
                 CustomizeRules rules = CustomizeRules.parse(gui.kits().config().getConfigurationSection("customize"));
                 CosmeticValidator validator = new CosmeticValidator(rules);
                 CosmeticApplier applier = new CosmeticApplier(rules, validator);
@@ -104,10 +116,7 @@ public final class RenameTargetPage extends GuiScreen {
                             }
                             CustomizePage.reopen(gui, p, kitSlot, taken);
                         },
-                        () -> {
-                            gui.takePendingCustomize(p.getUniqueId(), opId);
-                            CustomizePage.reopen(gui, p, kitSlot, session);
-                        });
+                        () -> cancelRename(p, opId));
             }, player), i % GuiLayouts.COLUMNS, i / GuiLayouts.COLUMNS);
         }
     }

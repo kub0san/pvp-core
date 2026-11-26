@@ -4,14 +4,12 @@ import org.bukkit.GameRule;
 import org.bukkit.GameRules;
 import org.bukkit.World;
 import org.bukkit.WorldBorder;
-import org.bukkit.configuration.ConfigurationSection;
+import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.event.HandlerList;
 import org.pvpcore.PvPCorePlugin;
 import org.pvpcore.module.PvPCoreModule;
 
 import java.lang.reflect.Method;
-import java.util.List;
-import java.util.Set;
 
 /**
  * Entry point for the optional PvP world generator.
@@ -29,13 +27,6 @@ public final class GenerationModule implements PvPCoreModule {
 
     private final PvPCorePlugin plugin;
     private final WorldGenSettings settings = new WorldGenSettings();
-
-    /**
-     * Loaded from {@code worldgen.expected-worlds} on enable and reload.
-     *
-     * <p>Kept local to this module; {@link WorldGenSettings} no longer duplicates it.</p>
-     */
-    private volatile Set<String> expectedWorlds = Set.of();
 
     private WorldSettingsListener listener;
 
@@ -55,8 +46,8 @@ public final class GenerationModule implements PvPCoreModule {
 
     /** Called from PvPCorePlugin#onEnable. */
     public void enable() {
-        settings.load(plugin, org.pvpcore.config.worldgen.WorldgenConfig.load(plugin));
-        loadExpectedWorlds();
+        FileConfiguration config = org.pvpcore.config.worldgen.WorldgenConfig.load(plugin);
+        settings.load(plugin, config);
         if (listener == null) {
             listener = new WorldSettingsListener(this);
             plugin.getServer().getPluginManager().registerEvents(listener, plugin);
@@ -79,8 +70,8 @@ public final class GenerationModule implements PvPCoreModule {
     /** Called from /pvp-core reload. */
     @Override
     public void reload() {
-        settings.load(plugin, org.pvpcore.config.worldgen.WorldgenConfig.load(plugin));
-        loadExpectedWorlds();
+        FileConfiguration config = org.pvpcore.config.worldgen.WorldgenConfig.load(plugin);
+        settings.load(plugin, config);
         applyToLoadedWorlds();
         plugin.getLogger().info("worldgen: settings reloaded (radius=" + settings.maxRadiusBlocks()
                 + ", border=" + settings.worldBorderDiameter() + "). "
@@ -107,9 +98,9 @@ public final class GenerationModule implements PvPCoreModule {
         return new ChunkGenerator(settings, biome);
     }
 
-    /** True when the world is listed in {@code worldgen.expected-worlds}. */
+    /** True when the world is listed in the root-level {@code expected-worlds} key of {@code worldgen/config.yml}. */
     public boolean isExpectedArenaWorld(String name) {
-        return expectedWorlds.contains(name);
+        return settings.snapshot().expectedWorlds().contains(name);
     }
 
     /** Logs the "world loaded without the pvp-core generator" warning. */
@@ -172,23 +163,6 @@ public final class GenerationModule implements PvPCoreModule {
         for (World world : plugin.getServer().getWorlds()) {
             applyWorldSettings(world);
         }
-    }
-
-    private void loadExpectedWorlds() {
-        org.bukkit.configuration.file.FileConfiguration worldgenConfig = org.pvpcore.config.worldgen.WorldgenConfig.load(plugin);
-        ConfigurationSection section = worldgenConfig;
-        if (section == null) {
-            expectedWorlds = Set.of();
-            return;
-        }
-        List<String> list = section.getStringList("expected-worlds");
-        java.util.Set<String> tmp = new java.util.HashSet<>();
-        for (String w : list) {
-            if (w != null && !w.isEmpty()) {
-                tmp.add(w);
-            }
-        }
-        expectedWorlds = java.util.Set.copyOf(tmp);
     }
 
     /**

@@ -24,7 +24,8 @@ final class UndergroundPopulator extends BlockPopulator {
     @Override
     public void populate(@NotNull WorldInfo info, @NotNull Random random,
                          int chunkX, int chunkZ, @NotNull LimitedRegion region) {
-        if (!settings.insideRadius(chunkX, chunkZ)) {
+        WorldGenSettings.Snapshot snapshot = settings.snapshot();
+        if (!settings.insideRadius(snapshot, chunkX, chunkZ)) {
             return;
         }
         final int minY = info.getMinHeight();
