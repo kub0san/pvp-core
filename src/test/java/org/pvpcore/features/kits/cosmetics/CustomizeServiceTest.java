@@ -146,8 +146,8 @@ class CustomizeServiceTest {
 
     @Test
     void disabledCosmeticsRejectContent() {
-        rules = new CustomizeRules(false, 6, false, false, 256,
-                java.util.Set.of(), java.util.Set.of(), java.util.Set.of());
+        rules = new CustomizeRules(false, false, false, 256,
+                java.util.Set.of(), java.util.Set.of());
 
         assertEquals(ApplyResult.INVALID_CONTENT, service().commit(player, 1, session));
         assertEquals(0, saves.get());

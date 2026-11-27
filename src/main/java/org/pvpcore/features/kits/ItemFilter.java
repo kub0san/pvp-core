@@ -37,6 +37,14 @@ public class ItemFilter {
     /** why: legacy static whitelist cache retained for external/legacy compatibility; instance filtering uses current kit-room whitelist state. */
     public static Set<String> whitelist = java.util.concurrent.ConcurrentHashMap.newKeySet();
     private static final int MAX_CONTAINER_DEPTH = 16; // why: recursion guard constant retained for nested container/bundle filtering safety.
+
+    /**
+     * Effective ceiling for enchant levels when the configured policy imposes no upper bound.
+     * This is an immutable sentinel, not a level to apply: the browser renders it as an infinity
+     * sign and left-click simply keeps increasing. It mirrors the absence of a level check in
+     * {@link #allowedEnchants} for explicit zero caps, over-levelled rules and disabled filters.
+     */
+    public static final int UNBOUNDED_ENCHANT_LEVEL = Integer.MAX_VALUE;
     private final KitsContext context;
     private final ItemFilterRules.Settings settings;
     private final Plugin plugin;
@@ -47,6 +55,13 @@ public class ItemFilter {
         this.plugin = context.plugin();
         this.settings = ItemFilterRules.parse(context.config());
         whitelist.clear();
+    }
+
+    /** Test seam for policy queries without a live plugin context; no static state is touched. */
+    ItemFilter(ItemFilterRules.Settings settings, Plugin plugin) {
+        this.context = null;
+        this.plugin = plugin;
+        this.settings = java.util.Objects.requireNonNull(settings, "settings");
     }
 
     public KitsContext context() { return context; }
@@ -108,7 +123,8 @@ public class ItemFilter {
         return true; // why: survivor fallback remains fail-open when kits context/filter unavailable to preserve legacy behavior.
     }
 
-    private boolean allowed(ItemStack item) {
+    /** Whether one item passes the configured kit-room policy; exposed for staged cosmetic edits. */
+    public boolean allowed(ItemStack item) {
         if (!settings.enabled() || item == null || item.getType().isAir()) return true;
         if (settings.kitRoomOnly() && !whitelist.contains(item.getType().name())) return false;
         if (item.getAmount() < 1 || item.getAmount() > item.getMaxStackSize()) return false;
@@ -126,6 +142,59 @@ public class ItemFilter {
             for (PotionEffect effect : potion.getCustomEffects()) if (!allowedEffect(effect, rule)) return false;
         }
         return true;
+    }
+
+    /**
+     * Configured level cap for one enchantment on an item, distinct from its effective ceiling.
+     * Returns {@code 0} both when no cap is configured and when a cap is explicitly zero; use
+     * {@link #configuredCap} to distinguish those states. The cap applies to stored enchants on
+     * books as well as applied enchants on other items.
+     */
+    public int maxLevel(ItemStack item, Enchantment enchantment) {
+        Integer max = configuredCap(item, enchantment);
+        return max == null ? 0 : max;
+    }
+
+    /** Nullable raw rule value: absent cap versus explicit zero are deliberately different. */
+    private Integer configuredCap(ItemStack item, Enchantment enchantment) {
+        if (enchantment == null || item == null || item.getType().isAir()) return null;
+        return settings.forMaterial(item.getType()).enchantments().get(enchantment.getKey().toString());
+    }
+
+    /** Read-only: whether this filter enforces any configured rules at all. */
+    public boolean enabled() {
+        return settings.enabled();
+    }
+
+    /**
+     * The level ceiling the browser may offer, derived from the same tri-state rule
+     * {@link #allowedEnchants} enforces: a positive configured cap is that cap; an explicit
+     * zero cap, an absent cap with {@code allow-over-levelled}, and a disabled filter are all
+     * unbounded; otherwise the vanilla maximum applies. A browser offering this ceiling can
+     * never offer a level Apply rejects, and never hides levels Apply accepts.
+     */
+    public int effectiveMaxLevel(ItemStack item, Enchantment enchantment) {
+        if (enchantment == null || item == null || item.getType().isAir()) return 1;
+        if (!settings.enabled()) return UNBOUNDED_ENCHANT_LEVEL;
+        Integer cap = configuredCap(item, enchantment);
+        if (cap != null) {
+            return cap > 0 ? cap : UNBOUNDED_ENCHANT_LEVEL;
+        }
+        if (settings.forMaterial(item.getType()).overLevelled()) return UNBOUNDED_ENCHANT_LEVEL;
+        try {
+            return Math.max(1, enchantment.getMaxLevel());
+        } catch (RuntimeException | LinkageError ex) {
+            return 1;
+        }
+    }
+
+    /**
+     * Read-only view of the effective conflicting-enchant rule for this item. When the
+     * filter is disabled there is no enforcement, so callers must not present a red badge.
+     */
+    public boolean allowsIncompatible(ItemStack item) {
+        if (!settings.enabled() || item == null || item.getType().isAir()) return true;
+        return settings.forMaterial(item.getType()).incompatible();
     }
 
     private boolean allowedEnchants(ItemStack item, Map<Enchantment, Integer> enchants, ItemFilterRules.Rule rule, boolean stored) {

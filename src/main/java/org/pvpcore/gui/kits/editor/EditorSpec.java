@@ -52,7 +52,6 @@ public final class EditorSpec {
     private final ItemStack[] content;
     private final GUI.EditorContext context;
     private final Button[] buttons = new Button[GuiLayouts.MENU_SIZE];
-    private boolean armorLabels;
 
     public EditorSpec(String title, String permission, LocationFeature feature,
                       int contentStart, int contentLength, boolean editable,
@@ -97,14 +96,6 @@ public final class EditorSpec {
 
     public GUI.EditorContext context() {
         return context;
-    }
-
-    public boolean armorLabels() {
-        return armorLabels;
-    }
-
-    public void armorLabels(boolean armorLabels) {
-        this.armorLabels = armorLabels;
     }
 
     public Button button(int slot) {

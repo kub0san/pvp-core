@@ -14,7 +14,8 @@ public final class ConfigUpdater {
     private static final List<ConfigSpec> BUNDLED_CONFIGS = List.of(
             new ConfigSpec("config.yml", List.of()),
             new ConfigSpec("messages.yml", List.of()),
-            new ConfigSpec("kits/config.yml", List.of()),
+            new ConfigSpec("kits/config.yml",
+                    List.of("customize.max-layers", "customize.allowed-banner-patterns")),
             new ConfigSpec("teleport/config.yml", List.of()),
             new ConfigSpec("teleport/rtp.yml", List.of()),
             new ConfigSpec("worldgen/config.yml", List.of()),

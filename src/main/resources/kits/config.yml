@@ -53,17 +53,15 @@ kits:
     clear-effects: false
     apply-potion-effects: true # NEW: Automatically applies potion effects from the kit
 
-# Cosmetic-only GUI for trims, shield banners and item names in personal kits.
+# Cosmetic-only GUI for trims and item names in personal kits.
 # Allowlists use registry keys (for example minecraft:coast); an empty list allows all.
 customize:
   enabled: true # false hides the editor button and blocks direct entry and Apply.
-  max-layers: 6 # Banner layers: 1-16 (hard cap 16).
   allow-click-events: false # Opt-in: allow <click:...> tags in item names.
   allow-hover-events: false # Opt-in: allow <hover:...> tags in item names.
   max-name-length: 256 # Raw name length: 1-1024.
   allowed-trim-patterns: []
   allowed-trim-materials: []
-  allowed-banner-patterns: []
 
 enderchests:
   load:

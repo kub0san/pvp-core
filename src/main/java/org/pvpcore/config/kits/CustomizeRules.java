@@ -15,22 +15,17 @@ import java.util.function.Consumer;
  */
 public record CustomizeRules(
         boolean enabled,
-        int maxLayers,
         boolean allowClickEvents,
         boolean allowHoverEvents,
         int maxNameLength,
         Set<String> allowedTrimPatterns,
-        Set<String> allowedTrimMaterials,
-        Set<String> allowedBannerPatterns) {
+        Set<String> allowedTrimMaterials) {
 
-    public static final int DEFAULT_MAX_LAYERS = 6;
-    public static final int HARD_MAX_LAYERS = 16;
     public static final int DEFAULT_MAX_NAME_LENGTH = 256;
 
     public CustomizeRules {
         allowedTrimPatterns = Set.copyOf(allowedTrimPatterns);
         allowedTrimMaterials = Set.copyOf(allowedTrimMaterials);
-        allowedBannerPatterns = Set.copyOf(allowedBannerPatterns);
     }
 
     /** Parses the {@code customize} section without emitting warnings. A null section yields defaults. */
@@ -43,32 +38,28 @@ public record CustomizeRules(
         Objects.requireNonNull(warn, "warn");
         if (section == null) return defaults();
 
-        Set<String> known = Set.of("enabled", "max-layers", "allow-click-events", "allow-hover-events",
-                "max-name-length", "allowed-trim-patterns", "allowed-trim-materials", "allowed-banner-patterns");
+        Set<String> known = Set.of("enabled", "allow-click-events", "allow-hover-events",
+                "max-name-length", "allowed-trim-patterns", "allowed-trim-materials");
         for (String key : section.getKeys(false)) {
             if (!known.contains(key)) warn.accept("customize." + key + ": unknown setting (ignored)");
         }
 
         return new CustomizeRules(
                 bool(section, "enabled", true, warn),
-                clamped(section, "max-layers", DEFAULT_MAX_LAYERS, 1, HARD_MAX_LAYERS, warn),
                 bool(section, "allow-click-events", false, warn),
                 bool(section, "allow-hover-events", false, warn),
                 clamped(section, "max-name-length", DEFAULT_MAX_NAME_LENGTH, 1, 1024, warn),
                 keys(section, "allowed-trim-patterns", warn),
-                keys(section, "allowed-trim-materials", warn),
-                keys(section, "allowed-banner-patterns", warn));
+                keys(section, "allowed-trim-materials", warn));
     }
 
     public boolean allowsTrimPattern(String id) { return allows(allowedTrimPatterns, id); }
 
     public boolean allowsTrimMaterial(String id) { return allows(allowedTrimMaterials, id); }
 
-    public boolean allowsBannerPattern(String id) { return allows(allowedBannerPatterns, id); }
-
     private static CustomizeRules defaults() {
-        return new CustomizeRules(true, DEFAULT_MAX_LAYERS, false, false, DEFAULT_MAX_NAME_LENGTH,
-                Set.of(), Set.of(), Set.of());
+        return new CustomizeRules(true, false, false, DEFAULT_MAX_NAME_LENGTH,
+                Set.of(), Set.of());
     }
 
     private static boolean allows(Set<String> allowed, String id) {

@@ -40,9 +40,9 @@ public final class GuiLayouts {
     public static final int KIT_CONTENT_START = 0;
     public static final int KIT_CONTENT_END = KitContents.INVENTORY_SIZE; // 41, exclusive
 
-    /** Ender chest layout content: slots 9-35. */
-    public static final int EC_CONTENT_START = 9;
-    public static final int EC_CONTENT_END = EC_CONTENT_START + KitContents.ENDERCHEST_SIZE; // 36, exclusive
+    /** Ender chest layout content: slots 0-26, filling the compact four-row editor. */
+    public static final int EC_CONTENT_START = 0;
+    public static final int EC_CONTENT_END = EC_CONTENT_START + KitContents.ENDERCHEST_SIZE; // 27, exclusive
 
     /**
      * Kit layouts keep boots, leggings, chestplate, helmet and offhand in
@@ -77,7 +77,21 @@ public final class GuiLayouts {
 
     // ---- Total chest rows per screen type ----
     public static final int ROWS_CONFIRM = 4;
+    /** Legacy six-row editor (kit room editor, customize-family screens). */
     public static final int ROWS_EDITOR = 6;
+    /** Compact item editors: five rows for a kit, four for an ender chest. */
+    public static final int ROWS_EDITOR_KIT = 5;
+    public static final int ROWS_EDITOR_EC = 4;
+
+    /**
+     * Compact editor controls occupy the last row, immediately after the content.
+     * The kit editor keeps its armor in row 4, so controls start at column 5;
+     * the ender chest editor's whole last row is free.
+     */
+    public static final int EDITOR_KIT_CONTROL_START = KIT_CONTENT_END; // 41
+    public static final int EDITOR_EC_CONTROL_START = EC_CONTENT_END; // 27
+    public static final int EDITOR_KIT_BACK_SLOT = ROWS_EDITOR_KIT * COLUMNS - 1; // 44
+    public static final int EDITOR_EC_BACK_SLOT = EDITOR_EC_CONTROL_START + 3; // 30
 
     // ---- Kit cosmetics customize screen ----
     public static final int EDITOR_CUSTOMIZE_SLOT = 41;
@@ -93,23 +107,53 @@ public final class GuiLayouts {
     public static final int RENAME_TARGET_LAST = 40;
     public static final int RENAME_BACK_SLOT = 53;
 
-    // ---- Banner designer ----
-    public static final int BANNER_TEMPLATE_SLOT = 0;
-    public static final int BANNER_PREVIEW_SLOT = 8;
-    public static final int BANNER_BASE_SLOT = 9;
-    public static final int BANNER_LAYERS_FIRST = 10;
-    public static final int BANNER_LAYERS_LAST = 36;
-    public static final int BANNER_ADD_SLOT = 37;
-    public static final int BANNER_REMOVE_SLOT = 38;
-    public static final int BANNER_UP_SLOT = 39;
-    public static final int BANNER_DOWN_SLOT = 40;
-    public static final int BANNER_BLANK_SLOT = 43;
-    public static final int BANNER_REVERT_SLOT = 44;
-    public static final int BANNER_BACK_SLOT = 45;
-    public static final int BANNER_APPLY_SLOT = 53;
-    public static final int ROWS_PREVIEW = 5;
+    // ---- Kit cosmetics: three-row customise hub and browser screens ----
+    // These are separate from the legacy six-row customize constants above. The
+    // legacy columns stay untouched for old screens; only the new screens below
+    // consume this contract. GuiLayoutChecks.checkCosmeticLayouts() pins it.
+
+    /** Customise hub: info / showcase / staged state on row 0, actions on row 1, hint on row 2. */
+    public static final int COSMETIC_HUB_ROWS = 3;
+    public static final int COSMETIC_HUB_SIZE = 27;
+    public static final int COSMETIC_HUB_INFO_SLOT = 0;
+    public static final int COSMETIC_HUB_PREVIEW_SLOT = 4;
+    public static final int COSMETIC_HUB_STATE_SLOT = 8;
+    public static final int COSMETIC_HUB_RENAME_SLOT = 9;
+    public static final int COSMETIC_HUB_ENCHANT_SLOT = 11;
+    public static final int COSMETIC_HUB_TRIM_SLOT = 13;
+    public static final int COSMETIC_HUB_APPLY_SLOT = 15;
+    public static final int COSMETIC_HUB_CANCEL_SLOT = 17;
+    public static final int COSMETIC_HUB_HINT_SLOT = 21;
+
+    /** Shared browser canvas: 18 entries, then preview / state / hint, then six nav controls. */
+    public static final int COSMETIC_BROWSER_ROWS = 3;
+    public static final int COSMETIC_BROWSER_SIZE = 27;
+    public static final int COSMETIC_BROWSER_ENTRIES_PER_PAGE = 18;
+    public static final int COSMETIC_BROWSER_ENTRY_FIRST = 0;
+    public static final int COSMETIC_BROWSER_ENTRY_LAST = 17;
+    public static final int COSMETIC_BROWSER_PREVIEW_SLOT = 18;
+    public static final int COSMETIC_BROWSER_STATE_SLOT = 19;
+    public static final int COSMETIC_BROWSER_HINT_SLOT = 20;
+
+    /** Enchant browser nav: Back / Prev / Next / Apply / Cancel / Page. */
+    public static final int COSMETIC_ENCHANT_BACK_SLOT = 21;
+    public static final int COSMETIC_ENCHANT_PREV_SLOT = 22;
+    public static final int COSMETIC_ENCHANT_NEXT_SLOT = 23;
+    public static final int COSMETIC_ENCHANT_APPLY_SLOT = 24;
+    public static final int COSMETIC_ENCHANT_CANCEL_SLOT = 25;
+    public static final int COSMETIC_ENCHANT_PAGE_SLOT = 26;
+
+    /** Trim browser nav: Mode / Prev / Next / Page / Remove / Back. */
+    public static final int COSMETIC_TRIM_MODE_SLOT = 21;
+    public static final int COSMETIC_TRIM_PREV_SLOT = 22;
+    public static final int COSMETIC_TRIM_NEXT_SLOT = 23;
+    public static final int COSMETIC_TRIM_PAGE_SLOT = 24;
+    public static final int COSMETIC_TRIM_REMOVE_SLOT = 25;
+    public static final int COSMETIC_TRIM_BACK_SLOT = 26;
 
     // ---- Public kit preview (5 rows, full canvas) ----
+    public static final int ROWS_PREVIEW = 5;
+
     /**
      * Row 4 of the preview: cols 0-4 hold the kit's armor (written straight
      * into the inventory), cols 5-6 are the only free cells and hold the

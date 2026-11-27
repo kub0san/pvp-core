@@ -1,5 +1,8 @@
 package org.pvpcore.gui.base;
 
+import java.util.HashSet;
+import java.util.Set;
+
 /**
  * Sanity checks on {@link GuiLayouts}. Runs once at plugin load. If any check
  * fails the plugin refuses to start with a message naming the bad constant,
@@ -35,15 +38,148 @@ public final class GuiLayoutChecks {
         }
     }
 
+    /** Pins the constant-derived values from which {@link #verify()} builds the slot arrays. */
+    private static void checkCosmeticConstants() {
+        assertEqual("COSMETIC_HUB_ROWS", GuiLayouts.COSMETIC_HUB_ROWS, 3);
+        assertEqual("COSMETIC_HUB_SIZE", GuiLayouts.COSMETIC_HUB_SIZE,
+                GuiLayouts.COSMETIC_HUB_ROWS * GuiLayouts.COLUMNS);
+        assertEqual("COSMETIC_BROWSER_ROWS", GuiLayouts.COSMETIC_BROWSER_ROWS, 3);
+        assertEqual("COSMETIC_BROWSER_SIZE", GuiLayouts.COSMETIC_BROWSER_SIZE,
+                GuiLayouts.COSMETIC_BROWSER_ROWS * GuiLayouts.COLUMNS);
+        assertEqual("COSMETIC_BROWSER_ENTRIES_PER_PAGE",
+                GuiLayouts.COSMETIC_BROWSER_ENTRIES_PER_PAGE, 18);
+        assertEqual("COSMETIC_BROWSER_ENTRY_FIRST", GuiLayouts.COSMETIC_BROWSER_ENTRY_FIRST, 0);
+        assertEqual("COSMETIC_BROWSER_ENTRY_LAST", GuiLayouts.COSMETIC_BROWSER_ENTRY_LAST,
+                GuiLayouts.COSMETIC_BROWSER_ENTRY_FIRST
+                        + GuiLayouts.COSMETIC_BROWSER_ENTRIES_PER_PAGE - 1);
+        assertEqual("COSMETIC_BROWSER_PREVIEW_SLOT", GuiLayouts.COSMETIC_BROWSER_PREVIEW_SLOT,
+                GuiLayouts.COSMETIC_BROWSER_ENTRY_LAST + 1);
+        assertEqual("COSMETIC_BROWSER_STATE_SLOT", GuiLayouts.COSMETIC_BROWSER_STATE_SLOT,
+                GuiLayouts.COSMETIC_BROWSER_PREVIEW_SLOT + 1);
+        assertEqual("COSMETIC_BROWSER_HINT_SLOT", GuiLayouts.COSMETIC_BROWSER_HINT_SLOT,
+                GuiLayouts.COSMETIC_BROWSER_STATE_SLOT + 1);
+    }
+
+    /**
+     * Three-row cosmetic screens. Package-private so tests can feed corrupt arrays and card
+     * slots through the exact code {@link #verify()} delegates to, without mutable statics.
+     * Legacy six-row customize slots overlap these numbers and are deliberately not compared.
+     */
+    static void checkCosmeticLayouts(int[] hub, int[] enchantNav, int[] trimNav,
+                                     int entriesPerPage, int size,
+                                     int preview, int state, int hint) {
+        // Guard inputs first: a corrupt array must name the broken invariant, never NPE/AIOOBE.
+        requireCosmeticArray("customise hub", hub, 9);
+        requireCosmeticArray("enchant nav", enchantNav, GuiLayouts.COLUMNS - 3);
+        requireCosmeticArray("trim nav", trimNav, GuiLayouts.COLUMNS - 3);
+
+        assertEqual("COSMETIC_BROWSER_ENTRIES_PER_PAGE", entriesPerPage, 18);
+        assertEqual("COSMETIC_BROWSER_SIZE", size, 27);
+        assertEqual("COSMETIC_HUB_SIZE", size, 27);
+
+        // Hub cards and actions are pinned, not merely distinct.
+        assertEqual("COSMETIC_HUB_INFO_SLOT", hub[0], 0);
+        assertEqual("COSMETIC_HUB_PREVIEW_SLOT", hub[1], 4);
+        assertEqual("COSMETIC_HUB_STATE_SLOT", hub[2], 8);
+        assertEqual("COSMETIC_HUB_RENAME_SLOT", hub[3], GuiLayouts.COLUMNS);
+        assertEqual("COSMETIC_HUB_ENCHANT_SLOT", hub[4], hub[3] + 2);
+        assertEqual("COSMETIC_HUB_TRIM_SLOT", hub[5], hub[4] + 2);
+        assertEqual("COSMETIC_HUB_APPLY_SLOT", hub[6], hub[5] + 2);
+        assertEqual("COSMETIC_HUB_CANCEL_SLOT", hub[7], hub[6] + 2);
+        assertEqual("COSMETIC_HUB_HINT_SLOT", hub[8], 21);
+
+        int entryLast = entriesPerPage - 1;
+        if (entryLast >= preview) {
+            throw new IllegalStateException("Cosmetic browser entries overlap the preview slot");
+        }
+        assertEqual("browser state slot", state, preview + 1);
+        assertEqual("browser hint slot", hint, state + 1);
+
+        assertCosmeticSlots("customise hub", hub, size);
+        assertCosmeticSlots("enchant browser",
+                cosmeticBrowserSlots(enchantNav, entriesPerPage, preview, state, hint), size);
+        assertCosmeticSlots("trim browser",
+                cosmeticBrowserSlots(trimNav, entriesPerPage, preview, state, hint), size);
+
+        // Both nav rows must start immediately after the injected hint slot.
+        assertEqual("cosmetic enchant nav first", enchantNav[0], hint + 1);
+        assertEqual("cosmetic trim nav first", trimNav[0], hint + 1);
+    }
+
+    private static void requireCosmeticArray(String name, int[] slots, int expectedLength) {
+        if (slots == null) {
+            throw new IllegalStateException(name + " slots must not be null");
+        }
+        if (slots.length != expectedLength) {
+            throw new IllegalStateException(
+                    name + " must have " + expectedLength + " slots; got " + slots.length);
+        }
+    }
+
+    /** Entries, then the injected preview / state / hint cards, then the screen's nav slots. */
+    private static int[] cosmeticBrowserSlots(int[] nav, int entriesPerPage,
+                                              int preview, int state, int hint) {
+        int[] slots = new int[entriesPerPage + 3 + nav.length];
+        int index = 0;
+        for (int slot = 0; slot < entriesPerPage; slot++) {
+            slots[index++] = slot;
+        }
+        slots[index++] = preview;
+        slots[index++] = state;
+        slots[index++] = hint;
+        System.arraycopy(nav, 0, slots, index, nav.length);
+        return slots;
+    }
+
+    private static void assertCosmeticSlots(String name, int[] slots, int size) {
+        for (int slot : slots) {
+            if (slot < 0 || slot >= size) {
+                throw new IllegalStateException(
+                        name + " slot " + slot + " is outside 0.." + (size - 1));
+            }
+        }
+        Set<Integer> seen = new HashSet<>();
+        for (int slot : slots) {
+            if (!seen.add(slot)) {
+                throw new IllegalStateException(name + " has duplicate slot " + slot);
+            }
+        }
+    }
+
     /** Called once from {@code PvPCorePlugin#onEnable}. */
     public static void verify() {
         checkEditorRows();
+        checkCompactEditorRows();
         checkKitRoomRows();
         checkPreviewRows();
         checkRowCounts();
         checkSettingsCapacity();
         checkDockRows();
         checkCustomizeRows();
+        checkCosmeticConstants();
+        checkCosmeticLayouts(
+                new int[]{
+                        GuiLayouts.COSMETIC_HUB_INFO_SLOT, GuiLayouts.COSMETIC_HUB_PREVIEW_SLOT,
+                        GuiLayouts.COSMETIC_HUB_STATE_SLOT, GuiLayouts.COSMETIC_HUB_RENAME_SLOT,
+                        GuiLayouts.COSMETIC_HUB_ENCHANT_SLOT, GuiLayouts.COSMETIC_HUB_TRIM_SLOT,
+                        GuiLayouts.COSMETIC_HUB_APPLY_SLOT, GuiLayouts.COSMETIC_HUB_CANCEL_SLOT,
+                        GuiLayouts.COSMETIC_HUB_HINT_SLOT
+                },
+                new int[]{
+                        GuiLayouts.COSMETIC_ENCHANT_BACK_SLOT, GuiLayouts.COSMETIC_ENCHANT_PREV_SLOT,
+                        GuiLayouts.COSMETIC_ENCHANT_NEXT_SLOT, GuiLayouts.COSMETIC_ENCHANT_APPLY_SLOT,
+                        GuiLayouts.COSMETIC_ENCHANT_CANCEL_SLOT, GuiLayouts.COSMETIC_ENCHANT_PAGE_SLOT
+                },
+                new int[]{
+                        GuiLayouts.COSMETIC_TRIM_MODE_SLOT, GuiLayouts.COSMETIC_TRIM_PREV_SLOT,
+                        GuiLayouts.COSMETIC_TRIM_NEXT_SLOT, GuiLayouts.COSMETIC_TRIM_PAGE_SLOT,
+                        GuiLayouts.COSMETIC_TRIM_REMOVE_SLOT, GuiLayouts.COSMETIC_TRIM_BACK_SLOT
+                },
+                GuiLayouts.COSMETIC_BROWSER_ENTRIES_PER_PAGE,
+                GuiLayouts.COSMETIC_BROWSER_SIZE,
+                GuiLayouts.COSMETIC_BROWSER_PREVIEW_SLOT,
+                GuiLayouts.COSMETIC_BROWSER_STATE_SLOT,
+                GuiLayouts.COSMETIC_BROWSER_HINT_SLOT);
     }
 
     // ------------------------------------------------------------------ screens
@@ -79,11 +215,8 @@ public final class GuiLayoutChecks {
         assertEqual("KIT_CONTENT_START", GuiLayouts.KIT_CONTENT_START, 0);
         assertEqual("KIT_CONTENT_END", GuiLayouts.KIT_CONTENT_END, GuiLayouts.EDITOR_ARMOR_SLOT_END);
 
-        // The ender-chest content is rows 1-3: row 0 is the top frame and
-        // row 4 is the divider.
-        assertEqual("EC_CONTENT_START", GuiLayouts.EC_CONTENT_START, GuiLayouts.COLUMNS);
-        assertEqual("EC_CONTENT_END", GuiLayouts.EC_CONTENT_END,
-                GuiLayouts.EDITOR_DIVIDER_ROW * GuiLayouts.COLUMNS);
+        // The ender-chest content and controls belong to the compact editor;
+        // their full contract is checked by checkCompactEditorRows().
 
         // The editor footer contract must live inside the footer row.
         int[] contract = {
@@ -102,6 +235,65 @@ public final class GuiLayoutChecks {
         }
         assertDistinctAscending("editor footer contract", contract);
         assertEqual("EDITOR_LABEL_START", GuiLayouts.EDITOR_LABEL_START, GuiLayouts.FOOTER_START);
+    }
+
+    /**
+     * Compact item editors are full-canvas screens: their content is written straight
+     * into the inventory and their controls follow it in the last row. Content and
+     * controls must not overlap, and both must fit the editor's row count.
+     */
+    private static void checkCompactEditorRows() {
+        assertEqual("ROWS_EDITOR_KIT", GuiLayouts.ROWS_EDITOR_KIT, 5);
+        assertEqual("ROWS_EDITOR_EC", GuiLayouts.ROWS_EDITOR_EC, 4);
+
+        int kitLastRowStart = (GuiLayouts.ROWS_EDITOR_KIT - 1) * GuiLayouts.COLUMNS;
+        int ecLastRowStart = (GuiLayouts.ROWS_EDITOR_EC - 1) * GuiLayouts.COLUMNS;
+
+        assertEqual("KIT_CONTENT_START", GuiLayouts.KIT_CONTENT_START, 0);
+        assertEqual("KIT_CONTENT_END", GuiLayouts.KIT_CONTENT_END, GuiLayouts.EDITOR_ARMOR_SLOT_END);
+        assertEqual("EDITOR_KIT_CONTROL_START", GuiLayouts.EDITOR_KIT_CONTROL_START, GuiLayouts.KIT_CONTENT_END);
+        assertEqual("EDITOR_KIT_CONTROL_START (column)", GuiLayouts.EDITOR_KIT_CONTROL_START,
+                kitLastRowStart + GuiLayouts.EDITOR_DIVIDER_FIRST_COL);
+        assertEqual("EDITOR_KIT_BACK_SLOT", GuiLayouts.EDITOR_KIT_BACK_SLOT,
+                GuiLayouts.ROWS_EDITOR_KIT * GuiLayouts.COLUMNS - 1);
+
+        assertEqual("EC_CONTENT_START", GuiLayouts.EC_CONTENT_START, 0);
+        assertEqual("EC_CONTENT_END", GuiLayouts.EC_CONTENT_END, ecLastRowStart);
+        assertEqual("EDITOR_EC_CONTROL_START", GuiLayouts.EDITOR_EC_CONTROL_START, GuiLayouts.EC_CONTENT_END);
+        assertEqual("EDITOR_EC_CONTROL_START (row)", GuiLayouts.EDITOR_EC_CONTROL_START, ecLastRowStart);
+        assertEqual("EDITOR_EC_BACK_SLOT", GuiLayouts.EDITOR_EC_BACK_SLOT,
+                GuiLayouts.EDITOR_EC_CONTROL_START + 3);
+        if (GuiLayouts.EDITOR_EC_BACK_SLOT >= GuiLayouts.ROWS_EDITOR_EC * GuiLayouts.COLUMNS) {
+            throw new IllegalStateException("EDITOR_EC_BACK_SLOT is outside the EC editor");
+        }
+
+        if (GuiLayouts.KIT_CONTENT_END > GuiLayouts.EDITOR_KIT_CONTROL_START
+                || GuiLayouts.EC_CONTENT_END > GuiLayouts.EDITOR_EC_CONTROL_START) {
+            throw new IllegalStateException("Editor content overlaps its controls");
+        }
+
+        // Both editors have exactly four controls (switch, import, clear, back) in their
+        // last row. A fifth control would spill out of the compact inventory.
+        int[] kitControls = {
+                GuiLayouts.EDITOR_KIT_CONTROL_START, GuiLayouts.EDITOR_KIT_CONTROL_START + 1,
+                GuiLayouts.EDITOR_KIT_CONTROL_START + 2, GuiLayouts.EDITOR_KIT_BACK_SLOT
+        };
+        int[] ecControls = {
+                GuiLayouts.EDITOR_EC_CONTROL_START, GuiLayouts.EDITOR_EC_CONTROL_START + 1,
+                GuiLayouts.EDITOR_EC_CONTROL_START + 2, GuiLayouts.EDITOR_EC_BACK_SLOT
+        };
+        assertDistinctAscending("kit editor controls", kitControls);
+        assertDistinctAscending("EC editor controls", ecControls);
+        for (int slot : kitControls) {
+            if (slot < kitLastRowStart || slot >= GuiLayouts.ROWS_EDITOR_KIT * GuiLayouts.COLUMNS) {
+                throw new IllegalStateException("Kit editor control " + slot + " is outside its last row");
+            }
+        }
+        for (int slot : ecControls) {
+            if (slot < ecLastRowStart || slot >= GuiLayouts.ROWS_EDITOR_EC * GuiLayouts.COLUMNS) {
+                throw new IllegalStateException("EC editor control " + slot + " is outside its last row");
+            }
+        }
     }
 
     private static void checkKitRoomRows() {

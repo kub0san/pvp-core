@@ -116,7 +116,7 @@ class CustomizeSessionTest {
             CustomizeSession session = new CustomizeSession(empty);
 
             assertEquals(41, session.working().length);
-            assertDoesNotThrow(() -> session.selectTarget(40)); // banner/offhand target
+            assertDoesNotThrow(() -> session.selectTarget(40)); // last/offhand slot
             assertNull(session.target());
             assertNull(session.working()[40]);
             assertTrue(session.matchesCurrent(new ItemStack[0])); // stale compare at Apply
@@ -142,9 +142,9 @@ class CustomizeSessionTest {
         ItemStack[] saved = new ItemStack[0];
         CustomizeSession session = new CustomizeSession(saved);
 
-        session.selectTarget(40); // banner tab
-        assertNull(session.target()); // designer refuses a non-shield without touching the kit
-        session.selectTarget(0); // rename target row
+        session.selectTarget(40); // last/offhand slot
+        assertNull(session.target()); // an empty slot must not fabricate an item
+        session.selectTarget(0); // first kit slot
         session.stageTarget(new ItemStack(Material.STONE));
         session.discard();
 

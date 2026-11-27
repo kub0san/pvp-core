@@ -104,11 +104,17 @@ public abstract class GuiScreen {
 
 
     /**
-     * The footer row of an editor: always row 5, never {@code rows - 2}.
-     * Editors have no bottom frame, so their footer is the last row.
+     * The footer row of an editor: row 5 on the legacy six-row editor, and the
+     * last row on the compact item editors (four or five rows). Editors have no
+     * bottom frame, so the footer is never {@code rows - 2}.
      */
     public final int editorFooterRow() {
-        return GuiLayouts.EDITOR_FOOTER_ROW;
+        return rows < GuiLayouts.ROWS_EDITOR ? rows - 1 : GuiLayouts.EDITOR_FOOTER_ROW;
+    }
+
+    /** Size of this screen's top inventory; use it instead of assuming six rows. */
+    public final int topSize() {
+        return rows * GuiLayouts.COLUMNS;
     }
 
     /**

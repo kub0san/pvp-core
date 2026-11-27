@@ -59,7 +59,7 @@ public class GUI implements GuiSession {
     // Instance state, per ADR 0008: pending rename/chat operations and reload invalidation.
     private final Map<UUID, PendingCustomize> pendingCustomize = new ConcurrentHashMap<>();
     private final Set<UUID> staleCustomize = ConcurrentHashMap.newKeySet();
-    // Refcounted: switching between customize, rename and banner screens must not
+    // Refcounted: switching between the item hub and cosmetic sub-screens must not
     // untrack a viewer while another of those screens is still open.
     private final Map<UUID, Integer> openCustomizeScreens = new ConcurrentHashMap<>();
 
@@ -77,7 +77,28 @@ public class GUI implements GuiSession {
         PUBLIC_KIT,
         ENDERCHEST,
         INSPECT_KIT,
-        INSPECT_ENDERCHEST
+        INSPECT_ENDERCHEST;
+
+        /** True for the compact ender-chest variants. */
+        public boolean enderchest() {
+            return this == ENDERCHEST || this == INSPECT_ENDERCHEST;
+        }
+
+        /** Top-inventory size this editor must have before its contents may be saved. */
+        public int topSize() {
+            return (enderchest() ? GuiLayouts.ROWS_EDITOR_EC : GuiLayouts.ROWS_EDITOR_KIT)
+                    * GuiLayouts.COLUMNS;
+        }
+
+        /** First editable content slot of this editor. */
+        public int contentStart() {
+            return enderchest() ? GuiLayouts.EC_CONTENT_START : GuiLayouts.KIT_CONTENT_START;
+        }
+
+        /** Exclusive end of the editable content range of this editor. */
+        public int contentEnd() {
+            return enderchest() ? GuiLayouts.EC_CONTENT_END : GuiLayouts.KIT_CONTENT_END;
+        }
     }
 
     public record EditorContext(EditorType type, int slot, String id, UUID target, String playerName) {
@@ -85,6 +106,11 @@ public class GUI implements GuiSession {
 
     public static EditorContext getAndRemoveEditorContext(UUID viewer) {
         return editorContexts.remove(viewer);
+    }
+
+    /** Reads the editor a player currently has open without consuming it. */
+    public static EditorContext peekEditorContext(Player viewer) {
+        return viewer == null ? null : editorContexts.get(viewer.getUniqueId());
     }
 
     public static void forgetMainMenuPage(UUID player) {
@@ -126,8 +152,8 @@ public class GUI implements GuiSession {
      * Stores a session for an async prompt and returns the id the callback must present.
      *
      * <p>Starting a chat/async prompt is not a fresh editor entry: this deliberately keeps any
-     * reload stale marker. Only {@code CustomizePage.open} clears stale state; a pending
-     * operation must not.</p>
+     * reload stale marker. Only a fresh {@code CustomizePage.open} of the item hub clears stale
+     * state; a pending operation (such as a rename prompt) must not.</p>
      */
     public UUID setPendingCustomize(UUID viewer, CustomizeSession session) {
         return holdPendingCustomize(viewer, session);
@@ -221,7 +247,7 @@ public class GUI implements GuiSession {
             return;
         }
         Inventory top = p.getOpenInventory().getTopInventory();
-        if (top.getSize() == GuiLayouts.MENU_SIZE && top.getLocation() == null) {
+        if (top.getSize() == context.type().topSize() && top.getLocation() == null) {
             EditorSaver.save(kits, p, context, top);
         }
     }

@@ -5,11 +5,15 @@ import com.github.stefvanschie.inventoryframework.gui.type.ChestGui;
 import com.github.stefvanschie.inventoryframework.pane.StaticPane;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
+import org.bukkit.event.inventory.ClickType;
+import org.bukkit.event.inventory.InventoryAction;
+import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 import org.pvpcore.features.kits.ItemFilter;
 import org.pvpcore.features.kits.KitManager;
 import org.pvpcore.features.kits.KitsContext;
+import org.pvpcore.features.kits.cosmetics.CustomizeSession;
 import org.pvpcore.gui.kits.GUI;
 import org.pvpcore.gui.base.GuiTheme;
 import org.pvpcore.gui.base.GuiFrame;
@@ -26,11 +30,10 @@ import java.util.UUID;
  * The framed item editor. Replaces {@code EditorGui}: the same kit, ender chest,
  * public kit and staff inspection screens, now on the framed v2 foundation.
  *
- * <p>Layout (6 rows):</p>
+ * <p>Compact layouts:</p>
  * <pre>
- *   rows 0-3   the kit's main inventory (36 slots)
- *   row 4      the kit's armor, columns 0-4 (kit layouts) or a divider (EC layouts)
- *   row 5      the footer contract: armor labels, mode, import, clear, back
+ *   kit editor (5 rows): slots 0-40 are the kit's inventory and armor, slots 41-44 the controls
+ *   EC editor  (4 rows): slots 0-26 are the ender chest, slots 27-30 the controls
  * </pre>
  *
  * <p>The items themselves are written straight into the inventory after the
@@ -40,11 +43,18 @@ import java.util.UUID;
 public final class ItemEditorPage extends GuiScreen {
     private static final String PERMISSION = "perplayerkit.admin";
 
+    private final GUI gui;
     private final EditorSpec spec;
 
     private ItemEditorPage(GUI gui, Player player, EditorSpec spec, GuiFrame.Density density) {
-        super(gui, player, GuiLayouts.ROWS_EDITOR, density, spec.permission(), spec.feature());
+        super(gui, player, rowsFor(spec.context().type()), density, spec.permission(), spec.feature());
+        this.gui = gui;
         this.spec = spec;
+    }
+
+    /** Kit-family editors get five rows; ender-chest family editors get four. */
+    private static int rowsFor(GUI.EditorType type) {
+        return type.enderchest() ? GuiLayouts.ROWS_EDITOR_EC : GuiLayouts.ROWS_EDITOR_KIT;
     }
 
     // ------------------------------------------------------------------ entry points
@@ -58,30 +68,7 @@ public final class ItemEditorPage extends GuiScreen {
                 "perplayerkit.kit", LocationFeature.KITS,
                 GuiLayouts.KIT_CONTENT_START, kitLength(), true, content,
                 new GUI.EditorContext(GUI.EditorType.KIT, slot, null, null, null));
-        spec.armorLabels(true);
-        spec.button(GuiLayouts.EDITOR_MODE_SLOT, new EditorSpec.Button(
-                GuiTheme.named(Material.ENDER_CHEST, GuiTheme.AQUA + "<bold>", "Ender chest", GuiTheme.dim("Edit ender chest " + slot), GuiTheme.hint("Click", "switch")),
-                (p, e) -> {
-                    SoundManager.playClick(p);
-                    gui.openEnderchestEditor(p, slot);
-                }));
-        spec.button(GuiLayouts.EDITOR_IMPORT_SLOT, EditorSpec.importButton(kits, "Import", "Copy what you carry",
-                p -> p.getInventory().getContents(), GuiLayouts.KIT_CONTENT_START, kitLength()));
-        spec.button(GuiLayouts.EDITOR_CLEAR_SLOT, EditorSpec.clearButton(GuiLayouts.KIT_CONTENT_START, kitLength()));
-        if (org.pvpcore.config.kits.CustomizeRules.parse(
-                kits.config().getConfigurationSection("customize")).enabled()) {
-            spec.button(GuiLayouts.EDITOR_CUSTOMIZE_SLOT, new EditorSpec.Button(
-                    GuiTheme.named(Material.ARMOR_STAND, GuiTheme.AQUA + "<bold>", "Customize", GuiTheme.dim("Trims, banners, names"), GuiTheme.hint("Click", "open")),
-                    (p, e) -> {
-                        SoundManager.playClick(p);
-                        gui.flushOpenEditor(p);
-                        CustomizePage.open(gui, p, slot, new org.pvpcore.features.kits.cosmetics.CustomizeSession(gui.kits().kitManager().getPlayerKit(p.getUniqueId(), slot)));
-                    }));
-        }
-        spec.button(GuiLayouts.EDITOR_BACK_SLOT, EditorSpec.backButton("Saved automatically", p -> {
-            gui.flushOpenEditor(p);
-            KitListPage.open(gui, p, KitListPage.pageOfSlot(p, false, slot));
-        }));
+        kitControls(gui, player, slot, kits, spec);
         new ItemEditorPage(gui, player, spec, GuiFrame.Density.EDITOR_ARMOR).show();
     }
 
@@ -94,19 +81,7 @@ public final class ItemEditorPage extends GuiScreen {
                 "perplayerkit.enderchest", LocationFeature.ENDERCHESTS,
                 GuiLayouts.EC_CONTENT_START, ecLength(), true, content,
                 new GUI.EditorContext(GUI.EditorType.ENDERCHEST, slot, null, null, null));
-        spec.button(GuiLayouts.EDITOR_MODE_SLOT, new EditorSpec.Button(
-                GuiTheme.named(Material.CHEST, GuiTheme.AQUA + "<bold>", "Kit", GuiTheme.dim("Edit kit " + slot), GuiTheme.hint("Click", "switch")),
-                (p, e) -> {
-                    SoundManager.playClick(p);
-                    gui.openKitEditor(p, slot);
-                }));
-        spec.button(GuiLayouts.EDITOR_IMPORT_SLOT, EditorSpec.importButton(kits, "Import", "Copy your ender chest",
-                p -> p.getEnderChest().getContents(), GuiLayouts.EC_CONTENT_START, ecLength()));
-        spec.button(GuiLayouts.EDITOR_CLEAR_SLOT, EditorSpec.clearButton(GuiLayouts.EC_CONTENT_START, ecLength()));
-        spec.button(GuiLayouts.EDITOR_BACK_SLOT, EditorSpec.backButton("Saved automatically", p -> {
-            gui.flushOpenEditor(p);
-            KitListPage.open(gui, p, KitListPage.pageOfSlot(p, true, slot));
-        }));
+        ecControls(gui, player, slot, kits, spec);
         new ItemEditorPage(gui, player, spec, GuiFrame.Density.EDITOR_EC).show();
     }
 
@@ -119,11 +94,11 @@ public final class ItemEditorPage extends GuiScreen {
                 PERMISSION, null,
                 GuiLayouts.KIT_CONTENT_START, kitLength(), true, content,
                 new GUI.EditorContext(GUI.EditorType.PUBLIC_KIT, 0, kitId, null, null));
-        spec.armorLabels(true);
-        spec.button(GuiLayouts.EDITOR_IMPORT_SLOT, EditorSpec.importButton(kits, "Import", "Copy what you carry",
+        int control = GuiLayouts.EDITOR_KIT_CONTROL_START;
+        spec.button(control + 1, EditorSpec.importButton(kits, "Import", "Copy what you carry",
                 p -> p.getInventory().getContents(), GuiLayouts.KIT_CONTENT_START, kitLength()));
-        spec.button(GuiLayouts.EDITOR_CLEAR_SLOT, EditorSpec.clearButton(GuiLayouts.KIT_CONTENT_START, kitLength()));
-        spec.button(GuiLayouts.EDITOR_BACK_SLOT, EditorSpec.backButton("Saved automatically", p -> {
+        spec.button(control + 2, EditorSpec.clearButton(GuiLayouts.KIT_CONTENT_START, kitLength()));
+        spec.button(GuiLayouts.EDITOR_KIT_BACK_SLOT, EditorSpec.backButton("Saved automatically", p -> {
             if (p.hasPermission("perplayerkit.editkitroom")) {
                 gui.OpenPremadeKitSettings(p, kitId);
             } else {
@@ -145,10 +120,9 @@ public final class ItemEditorPage extends GuiScreen {
                 admin ? PERMISSION : "perplayerkit.staff", null,
                 GuiLayouts.KIT_CONTENT_START, kitLength(), admin, content,
                 new GUI.EditorContext(GUI.EditorType.INSPECT_KIT, slot, null, target, playerName));
-        spec.armorLabels(true);
-        spec.button(GuiLayouts.EDITOR_BACK_SLOT, EditorSpec.closeButton());
+        spec.button(GuiLayouts.EDITOR_KIT_BACK_SLOT, EditorSpec.closeButton());
         if (admin) {
-            spec.button(GuiLayouts.EDITOR_CLEAR_SLOT, EditorSpec.deleteButton(kits, "kit " + slot, playerName,
+            spec.button(GuiLayouts.EDITOR_KIT_CONTROL_START + 2, EditorSpec.deleteButton(kits, "kit " + slot, playerName,
                     () -> {
                         kitManager.deleteKit(target, slot);
                         return "success.admin-kit-deleted";
@@ -169,9 +143,9 @@ public final class ItemEditorPage extends GuiScreen {
                 admin ? PERMISSION : "perplayerkit.staff", null,
                 GuiLayouts.EC_CONTENT_START, ecLength(), admin, content,
                 new GUI.EditorContext(GUI.EditorType.INSPECT_ENDERCHEST, slot, null, target, playerName));
-        spec.button(GuiLayouts.EDITOR_BACK_SLOT, EditorSpec.closeButton());
+        spec.button(GuiLayouts.EDITOR_EC_BACK_SLOT, EditorSpec.closeButton());
         if (admin) {
-            spec.button(GuiLayouts.EDITOR_CLEAR_SLOT, EditorSpec.deleteButton(kits, "ender chest " + slot, playerName,
+            spec.button(GuiLayouts.EDITOR_EC_CONTROL_START + 2, EditorSpec.deleteButton(kits, "ender chest " + slot, playerName,
                     () -> {
                         kitManager.deleteEnderchest(target, slot);
                         return "success.admin-ec-deleted";
@@ -179,6 +153,47 @@ public final class ItemEditorPage extends GuiScreen {
         }
         new ItemEditorPage(gui, player, spec, GuiFrame.Density.EDITOR_EC).show();
         SoundManager.playOpenGui(player);
+    }
+
+    /**
+     * The four compact kit controls: switch, import, clear and back. Cosmetics are reached by
+     * shift-clicking an item, so there is no separate Customize button in the footer.
+     */
+    static void kitControls(GUI gui, Player player, int slot, KitsContext kits, EditorSpec spec) {
+        int control = GuiLayouts.EDITOR_KIT_CONTROL_START;
+        spec.button(control, new EditorSpec.Button(
+                GuiTheme.named(Material.ENDER_CHEST, GuiTheme.AQUA + "<bold>", "Ender chest",
+                        GuiTheme.dim("Edit ender chest " + slot), GuiTheme.hint("Click", "switch")),
+                (p, e) -> {
+                    SoundManager.playClick(p);
+                    gui.openEnderchestEditor(p, slot);
+                }));
+        spec.button(control + 1, EditorSpec.importButton(kits, "Import", "Copy what you carry",
+                p -> p.getInventory().getContents(), GuiLayouts.KIT_CONTENT_START, kitLength()));
+        spec.button(control + 2, EditorSpec.clearButton(GuiLayouts.KIT_CONTENT_START, kitLength()));
+        spec.button(GuiLayouts.EDITOR_KIT_BACK_SLOT, EditorSpec.backButton("Saved automatically", p -> {
+            gui.flushOpenEditor(p);
+            KitListPage.open(gui, p, KitListPage.pageOfSlot(p, false, slot));
+        }));
+    }
+
+    /** The four compact ender-chest controls: switch, import, clear and back. */
+    static void ecControls(GUI gui, Player player, int slot, KitsContext kits, EditorSpec spec) {
+        int control = GuiLayouts.EDITOR_EC_CONTROL_START;
+        spec.button(control, new EditorSpec.Button(
+                GuiTheme.named(Material.CHEST, GuiTheme.AQUA + "<bold>", "Kit",
+                        GuiTheme.dim("Edit kit " + slot), GuiTheme.hint("Click", "switch")),
+                (p, e) -> {
+                    SoundManager.playClick(p);
+                    gui.openKitEditor(p, slot);
+                }));
+        spec.button(control + 1, EditorSpec.importButton(kits, "Import", "Copy your ender chest",
+                p -> p.getEnderChest().getContents(), GuiLayouts.EC_CONTENT_START, ecLength()));
+        spec.button(control + 2, EditorSpec.clearButton(GuiLayouts.EC_CONTENT_START, ecLength()));
+        spec.button(GuiLayouts.EDITOR_EC_BACK_SLOT, EditorSpec.backButton("Saved automatically", p -> {
+            gui.flushOpenEditor(p);
+            KitListPage.open(gui, p, KitListPage.pageOfSlot(p, true, slot));
+        }));
     }
 
     private static int kitLength() {
@@ -201,27 +216,33 @@ public final class ItemEditorPage extends GuiScreen {
         // The items live in the inventory, not in a pane. See afterShow.
     }
 
+    /**
+     * Columns of the editor's last row that hold directly written content. Chrome must never
+     * paint filler there, or a redraw would wipe the player's armor.
+     */
+    static boolean[] reservedColumns(EditorSpec spec, int footerRow) {
+        boolean[] reserved = new boolean[GuiLayouts.COLUMNS];
+        int lastRowStart = footerRow * GuiLayouts.COLUMNS;
+        for (int col = 0; col < GuiLayouts.COLUMNS; col++) {
+            if (spec.isContentSlot(lastRowStart + col)) reserved[col] = true;
+        }
+        return reserved;
+    }
+
     @Override
     protected void renderChrome(StaticPane chrome) {
         int footerRow = editorFooterRow();
-        boolean[] filled = new boolean[GuiLayouts.COLUMNS];
+        boolean[] filled = reservedColumns(spec, footerRow);
 
-        if (spec.armorLabels()) {
-            addLabel(chrome, 0, Material.CHAINMAIL_BOOTS, "Boots");
-            addLabel(chrome, 1, Material.CHAINMAIL_LEGGINGS, "Leggings");
-            addLabel(chrome, 2, Material.CHAINMAIL_CHESTPLATE, "Chestplate");
-            addLabel(chrome, 3, Material.CHAINMAIL_HELMET, "Helmet");
-            addLabel(chrome, 4, Material.SHIELD, "Offhand");
-            for (int col = 0; col <= 4; col++) filled[col] = true;
-        }
-
-        // Every editor button lives in the footer row.
-        for (int slot = 0; slot < GuiLayouts.MENU_SIZE; slot++) {
+        // Compact editors have no separate footer row: their controls follow the content.
+        int modeSlot = spec.context().type().enderchest()
+                ? GuiLayouts.EDITOR_EC_CONTROL_START : GuiLayouts.EDITOR_KIT_CONTROL_START;
+        for (int slot = 0; slot < topSize(); slot++) {
             EditorSpec.Button button = spec.button(slot);
             if (button == null) continue;
-            if (!spec.editable() && (slot == GuiLayouts.EDITOR_IMPORT_SLOT || slot == GuiLayouts.EDITOR_MODE_SLOT)) continue;
+            if (!spec.editable() && (slot == modeSlot || slot == modeSlot + 1)) continue;
             int col = slot % GuiLayouts.COLUMNS;
-            chrome.addItem(wrap(button.item(), button.click(), player), col, slot / GuiLayouts.COLUMNS);
+            chrome.addItem(wrap(button.item(), button.click(), player), col, footerRow);
             filled[col] = true;
         }
 
@@ -231,18 +252,83 @@ public final class ItemEditorPage extends GuiScreen {
         }
     }
 
-    /** One armor label, placed by its absolute slot in the footer row. */
-    private void addLabel(StaticPane chrome, int offset, Material icon, String name) {
-        int slot = GuiLayouts.EDITOR_LABEL_START + offset;
-        chrome.addItem(new GuiItem(GuiTheme.named(icon, GuiTheme.MUTED, name, GuiTheme.dim("Slot above"))),
-                slot % GuiLayouts.COLUMNS, slot / GuiLayouts.COLUMNS);
-    }
-
     // ------------------------------------------------------------------ lifecycle
 
     @Override
     protected void protect(ChestGui chest) {
-        GuiGuard.editable(chest, spec.permission(), spec.feature(), spec::isEditableSlot);
+        GuiGuard.editable(chest, spec.permission(), spec.feature(), spec::isEditableSlot,
+                topSize(), this::handleContentClick, this::handleGlobalClick);
+    }
+
+    /**
+     * Raw-slot item actions. These are composed into the guard, never assigned over it, so the
+     * permission, collect-to-cursor, non-editable-slot and drag rules stay intact. Cancelling
+     * happens only when an action actually claims the click: ordinary pickups and placements in
+     * the content range must keep working.
+     */
+    private void handleContentClick(InventoryClickEvent event) {
+        if (!spec.editable()) {
+            return;
+        }
+        int raw = event.getRawSlot();
+        int start = spec.contentStart();
+        int end = start + spec.contentLength();
+        ClickType click = event.getClick();
+
+        if (ItemEditorActions.customize(click, raw, start, end)) {
+            event.setCancelled(true);
+            ItemStack current = event.getCurrentItem();
+            if (current != null && !current.getType().isAir()) {
+                openCustomize(raw - spec.contentStart());
+            }
+            return;
+        }
+        boolean cursorEmpty = event.getCursor() == null || event.getCursor().getType().isAir();
+        if (ItemEditorActions.copy(click, raw, start, end, cursorEmpty)) {
+            event.setCancelled(true);
+            ItemStack current = event.getCurrentItem();
+            if (current != null && !current.getType().isAir()) {
+                // The slot holds a display clone; copy the original stack, never the hints.
+                ItemStack copy = current.clone();
+                EditorHintLore.strip(copy);
+                event.setCursor(copy);
+            }
+            return;
+        }
+        if (ItemEditorActions.discard(click, raw, start, end)) {
+            event.setCancelled(true);
+            // Remove the complete stack without letting vanilla spawn an ItemEntity.
+            event.setCurrentItem(null);
+        }
+    }
+
+    /** Stops offhand swaps and bottom-inventory number-key swaps from reaching the editor's slots. */
+    private void handleGlobalClick(InventoryClickEvent event) {
+        // Offhand swaps must be cancelled regardless of which inventory the click originated in:
+        // a top-slot F-click can still move an item into or out of the editor's offhand slot.
+        if (event.getClick() == ClickType.SWAP_OFFHAND) {
+            event.setCancelled(true);
+            return;
+        }
+        if (event.getRawSlot() < topSize()) {
+            return;
+        }
+        InventoryAction action = event.getAction();
+        if (action == InventoryAction.HOTBAR_SWAP || action == InventoryAction.HOTBAR_MOVE_AND_READD) {
+            event.setCancelled(true);
+        }
+    }
+
+    /** Shift-click entry into the item-specific cosmetics hub. */
+    private void openCustomize(int itemSlot) {
+        GUI.EditorContext context = spec.context();
+        if (!spec.editable() || context == null || context.type() != GUI.EditorType.KIT) {
+            return;
+        }
+        gui.flushOpenEditor(player);
+        CustomizePage.open(gui, player,
+                new CustomizeSession(gui.kits().kitManager().getPlayerKit(player.getUniqueId(), context.slot())),
+                itemSlot, context.slot());
     }
 
     @Override
@@ -264,7 +350,9 @@ public final class ItemEditorPage extends GuiScreen {
         ItemStack[] content = spec.content();
         for (int i = 0; i < spec.contentLength(); i++) {
             ItemStack item = content != null && i < content.length ? content[i] : null;
-            inventory.setItem(spec.contentStart() + i, item);
+            // Only the visible clone carries hints; the stored item stays untouched.
+            ItemStack display = item == null ? null : EditorHintLore.apply(item.clone());
+            inventory.setItem(spec.contentStart() + i, display);
         }
         // Must come after show(): opening the new inventory closes the previous one,
         // and that close would otherwise consume this context.

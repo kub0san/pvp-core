@@ -60,13 +60,6 @@ class CosmeticValidatorTest {
     }
 
     @Test
-    void unreadableLayerIsCounted() {
-        CosmeticValidator validator = new CosmeticValidator(CustomizeRules.parse(null));
-        assertEquals(2, validator.unreadableLayerCount(5, 3));
-        assertEquals(0, validator.unreadableLayerCount(3, 5));
-    }
-
-    @Test
     void clickAndHoverAreOptIn() {
         MemoryConfiguration section = new MemoryConfiguration();
         section.set("allow-click-events", true);
@@ -90,7 +83,5 @@ class CosmeticValidatorTest {
         CosmeticValidator validator = new CosmeticValidator(CustomizeRules.parse(null));
         assertTrue(validator.isArmor(new ItemStack(Material.DIAMOND_CHESTPLATE)));
         assertFalse(validator.isArmor(new ItemStack(Material.SHIELD)));
-        assertTrue(validator.isShield(new ItemStack(Material.SHIELD)));
-        assertFalse(validator.isShield(new ItemStack(Material.DIAMOND_CHESTPLATE)));
     }
 }
