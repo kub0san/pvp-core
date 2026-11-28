@@ -45,7 +45,7 @@ locations:
 #     - "world:protected_area" # One region in world.
 
 kits:
-  max-slots: 99 # 1-99. Applies to personal kits and enderchest kits.
+  max-slots: 90 # 1-99. Applies to personal kits and enderchest kits.
   load:
     heal: false
     feed: false
@@ -83,10 +83,6 @@ rekit:
     enabled: false
     restore-enderchest: false
     kits: {}
-
-# Autosetup fills unsaved pages. Extra pages start empty.
-kitroom:
-  pages: 5 # 1-99. The default page count for fresh installs. (Editable in-game via /kitroom edit).
 
 # Keys below (crystal, mace, ...) are public kit IDs. Contents are saved separately.
 # Autosetup fills declared starter IDs.
