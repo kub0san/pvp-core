@@ -76,6 +76,13 @@ teleportation:
   rtp-info-header: "<prefix> <gray>RTP REGIONS</gray> <dark_gray>━━━━━━━━━━━━━━━━━━━━</dark_gray>"
   rtp-info-region: "  <aqua><id></aqua> <dark_gray>-</dark_gray> <gray>world <white><world></white> (loaded: <white><loaded></white>)</gray> <dark_gray>-</dark_gray> <gray>ready spots <white><ready>/<target></white></gray>"
 
+  # RTP queue (/rtpq)
+  rtpq-joined: "<prefix> <gray>Joined the queue for <white><region></white>. <yellow><queued></yellow> waiting.</gray>"
+  rtpq-left: "<prefix> <gray>You left the RTP queue.</gray>"
+  rtpq-not-queued: "<prefix> <red>You are not in an RTP queue.</red>"
+  rtpq-already-queued: "<prefix> <red>You are already queued for <white><region></white>. Use <yellow>/rtpq leave</yellow> first.</red>"
+  rtpq-matched: "<prefix> <green>Matched with <white><player></white> in <white><region></white>. Teleporting...</green>"
+
 pvpcore: # Renamed from 'kits'
   prefix: ""
 

@@ -32,10 +32,10 @@ public final class TpCommands {
 
     private static final List<String> TELEPORT_SUBS = List.of(
             "tpa", "tpahere", "tpaccept", "tpdeny", "tpcancel",
-            "tphere", "back", "spawn", "setspawn", "rtp");
+            "tphere", "back", "spawn", "setspawn", "rtp", "rtpq");
 
     private static final List<String> BUKKIT_NAMES = List.of(
-            "tpa", "tpahere", "tpaccept", "tpdeny", "tpcancel", "tphere", "back", "spawn", "setspawn", "rtp");
+            "tpa", "tpahere", "tpaccept", "tpdeny", "tpcancel", "tphere", "back", "spawn", "setspawn", "rtp", "rtpq");
 
     private TpCommands() {
     }
@@ -70,6 +70,7 @@ public final class TpCommands {
         subs.add(noArgs(plugin, "spawn"));
         subs.add(noArgs(plugin, "setspawn"));
         subs.add(rtp(plugin));
+        subs.add(rtpq(plugin));
         return subs;
     }
 
@@ -107,6 +108,17 @@ public final class TpCommands {
                 .withOptionalArguments(tail)
                 .executes((CommandExecutor) (sender, args) -> execTail(plugin, sender, "rtp", args))
                 .executesConsole((ConsoleCommandExecutor) (sender, args) -> execTail(plugin, sender, "rtp", args));
+    }
+
+    private static CommandAPICommand rtpq(PvPCorePlugin plugin) {
+        GreedyStringArgument tail = new GreedyStringArgument("args");
+        tail.setOptional(true);
+        tail.replaceSuggestions(ArgumentSuggestions.strings(info ->
+                suggest(plugin, "rtpq", info.sender(), info.currentArg())));
+        return new CommandAPICommand("rtpq")
+                .withOptionalArguments(tail)
+                .executes((CommandExecutor) (sender, args) -> execTail(plugin, sender, "rtpq", args))
+                .executesConsole((ConsoleCommandExecutor) (sender, args) -> execTail(plugin, sender, "rtpq", args));
     }
 
     private static void exec(PvPCorePlugin plugin, CommandSender sender, String sub, CommandArguments args, String node) {

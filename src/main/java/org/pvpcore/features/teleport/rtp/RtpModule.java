@@ -1,5 +1,6 @@
 package org.pvpcore.features.teleport.rtp;
 
+import org.bukkit.event.HandlerList;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.pvpcore.config.Messages;
 import org.pvpcore.features.teleport.TeleportModule;
@@ -25,6 +26,10 @@ public final class RtpModule {
     private RtpSettings settings;
     private RtpService service;
     private RtpCommand command;
+    private RtpQueue rtpq;
+    private RtpqCommand rtpqCommand;
+    private RtpMatchmaker matchmaker;
+    private RtpQueueListener rtpqListener;
 
     public RtpModule(JavaPlugin plugin, TeleportModule teleport, TeleportService teleportService, File folder) {
         this.plugin = plugin;
@@ -39,6 +44,15 @@ public final class RtpModule {
         service = new RtpService(plugin, teleport);
         command = new RtpCommand(teleport, teleportService, this);
         service.configure(settings, buildVerifiers(settings));
+
+        rtpq = new RtpQueue();
+        matchmaker = new RtpMatchmaker(plugin, teleportService, this::settings,
+                () -> teleport.messages(), (region, player) -> service.acquire(region, player));
+        rtpq.setMatchSink(matchmaker::startMatch);
+        rtpqCommand = new RtpqCommand(teleport, this);
+        rtpqListener = new RtpQueueListener(rtpq);
+        plugin.getServer().getPluginManager().registerEvents(rtpqListener, plugin);
+
         log("enabled");
     }
 
@@ -47,6 +61,9 @@ public final class RtpModule {
         if (service == null) {
             return;
         }
+        if (rtpq != null) {
+            rtpq.clear();
+        }
         settings = load();
         service.configure(settings, buildVerifiers(settings));
         log("reloaded");
@@ -54,6 +71,12 @@ public final class RtpModule {
 
     /** Called from TeleportModule#disable. */
     public void disable() {
+        if (rtpq != null) {
+            rtpq.clear();
+        }
+        if (rtpqListener != null) {
+            HandlerList.unregisterAll(rtpqListener);
+        }
         if (service != null) {
             service.shutdown();
         }
@@ -69,6 +92,22 @@ public final class RtpModule {
 
     public RtpCommand command() {
         return command;
+    }
+
+    public RtpQueue rtpq() {
+        return rtpq;
+    }
+
+    public RtpqCommand rtpqCommand() {
+        return rtpqCommand;
+    }
+
+    public RtpMatchmaker matchmaker() {
+        return matchmaker;
+    }
+
+    public TeleportModule teleport() {
+        return teleport;
     }
 
     private RtpSettings load() {

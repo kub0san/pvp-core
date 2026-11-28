@@ -47,6 +47,10 @@ commands:
   rtp:
     description: Teleport to a random safe location
     usage: /rtp [region]
+  rtpq:
+    description: Join the 1v1 random teleport matchmaking queue
+    usage: /rtpq [region|leave]
+    permission: pvpcore.teleportation.rtpq
 
 
   perplayerkit:
@@ -256,6 +260,7 @@ permissions:
       pvpcore.teleportation.tphere: true
       pvpcore.teleportation.setspawn: true
       pvpcore.teleportation.rtp: true
+      pvpcore.teleportation.rtpq: true
       pvpcore.teleportation.rtp.admin: true
       pvpcore.teleportation.bypass.cooldown: true
       pvpcore.teleportation.bypass.warmup: true
@@ -280,6 +285,9 @@ permissions:
     default: op
   pvpcore.teleportation.rtp:
     description: Use /rtp
+    default: true
+  pvpcore.teleportation.rtpq:
+    description: Use /rtpq
     default: true
   pvpcore.teleportation.rtp.admin:
     description: Use /rtp info

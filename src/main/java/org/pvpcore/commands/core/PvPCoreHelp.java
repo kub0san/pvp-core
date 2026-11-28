@@ -74,7 +74,8 @@ public final class PvPCoreHelp {
             new Spec("back", "Teleportation", "/pvp-core back", "Return to your last location.", "pvpcore.teleportation.back"),
             new Spec("spawn", "Teleportation", "/pvp-core spawn", "Teleport to the server spawn.", "pvpcore.teleportation.spawn"),
             new Spec("setspawn", "Teleportation", "/pvp-core setspawn", "Set the server spawn to your location.", "pvpcore.teleportation.setspawn"),
-            new Spec("rtp", "Teleportation", "/pvp-core rtp [region]", "Teleport to a random safe location.", "pvpcore.teleportation.rtp")
+            new Spec("rtp", "Teleportation", "/pvp-core rtp [region]", "Teleport to a random safe location.", "pvpcore.teleportation.rtp"),
+            new Spec("rtpq", "Teleportation", "/pvp-core rtpq [region|leave]", "RTP 1v1 matchmaking queue.", "pvpcore.teleportation.rtpq")
     );
 
     private static final Map<String, List<Spec>> BY_CATEGORY = new LinkedHashMap<>();

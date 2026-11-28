@@ -18,11 +18,11 @@ import java.util.Locale;
 import java.util.Optional;
 import java.util.UUID;
 
-/** Handles /tpa, /tpahere, /tpaccept, /tpdeny, /tpcancel, /tphere, /back, /spawn, /setspawn, /rtp. */
+/** Handles /tpa, /tpahere, /tpaccept, /tpdeny, /tpcancel, /tphere, /back, /spawn, /setspawn, /rtp, /rtpq. */
 public final class TeleportCommands implements CommandExecutor, TabCompleter {
 
     public static final List<String> NAMES = List.of(
-            "tpa", "tpahere", "tpaccept", "tpdeny", "tpcancel", "tphere", "back", "spawn", "setspawn", "rtp");
+            "tpa", "tpahere", "tpaccept", "tpdeny", "tpcancel", "tphere", "back", "spawn", "setspawn", "rtp", "rtpq");
 
     private static final String BYPASS_COOLDOWN = "pvpcore.teleportation.bypass.cooldown";
 
@@ -63,6 +63,7 @@ public final class TeleportCommands implements CommandExecutor, TabCompleter {
             case "spawn" -> spawn(player);
             case "setspawn" -> setSpawn(player);
             case "rtp" -> module.rtp().command().run(player, args);
+            case "rtpq" -> module.rtp().rtpqCommand().run(player, args);
             default -> {
                 return false;
             }
@@ -223,6 +224,9 @@ public final class TeleportCommands implements CommandExecutor, TabCompleter {
         String name = command.getName().toLowerCase(Locale.ROOT);
         if (name.equals("rtp")) {
             return module.rtp().command().tabComplete(sender, args);
+        }
+        if (name.equals("rtpq")) {
+            return module.rtp().rtpqCommand().tabComplete(sender, args);
         }
         if (args.length != 1 || !(name.equals("tpa") || name.equals("tpahere") || name.equals("tphere"))) {
             return List.of();

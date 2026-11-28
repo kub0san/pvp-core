@@ -52,7 +52,7 @@ public final class PvPCoreCommandFallback {
     private static final String[] NO_ARGS = new String[0];
     private static final List<String> TELEPORT_SUBS = List.of(
             "tpa", "tpahere", "tpaccept", "tpdeny", "tpcancel",
-            "tphere", "back", "spawn", "setspawn", "rtp");
+            "tphere", "back", "spawn", "setspawn", "rtp", "rtpq");
 
     private final PvPCorePlugin plugin;
     private final PvPCoreHelp help;
